@@ -396,15 +396,41 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
     ? gameState.setupState?.player2Draft
     : gameState.setupState?.player1Draft;
 
+  // 線上已送出配置後：改顯示 gameState（本地暫存會被清空）
+  const setupCommitted =
+    gameState.phase === 'setup' && mySetupReady && !isLocalGuest;
+
+  const displayWall1 =
+    setupCommitted || gameState.phase !== 'setup'
+      ? bottomPlayer.walls[0]?.cards[0] ?? null
+      : setupWall1;
+  const displayWall2 =
+    setupCommitted || gameState.phase !== 'setup'
+      ? bottomPlayer.walls[1]?.cards[0] ?? null
+      : setupWall2;
+  const displayWall3 =
+    setupCommitted || gameState.phase !== 'setup'
+      ? bottomPlayer.walls[2]?.cards[0] ?? null
+      : setupWall3;
+  const displayAttackSlots: [Card | null, Card | null] =
+    setupCommitted || gameState.phase !== 'setup'
+      ? [
+          bottomPlayer.attackZone[0]?.card ?? null,
+          bottomPlayer.attackZone[1]?.card ?? null,
+        ]
+      : setupAttackSlots;
+
   const setupUsedIds = new Set(
     [setupWall1?.id, setupWall2?.id, setupWall3?.id, setupAttackSlots[0]?.id, setupAttackSlots[1]?.id]
       .filter(Boolean) as string[]
   );
 
-  const setupAvailableDraft = (setupDraftCards ?? []).filter(c => !setupUsedIds.has(c.id));
+  const setupAvailableDraft = setupCommitted
+    ? []
+    : (setupDraftCards ?? []).filter(c => !setupUsedIds.has(c.id));
   const setupSelectedCardId = selectedHandCardIds[0] ?? null;
   const setupIsReady = !!(setupWall1 && setupWall2 && setupWall3 && setupAttackSlots[0] && setupAttackSlots[1]);
-  const setupIsPlacing = !!(setupDraggingCardId || setupSelectedCardId);
+  const setupIsPlacing = !setupCommitted && !!(setupDraggingCardId || setupSelectedCardId);
 
   const findSetupCard = (cardId: string): Card | undefined =>
     setupDraftCards?.find(c => c.id === cardId);
@@ -995,32 +1021,36 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
                   {gameState.phase === 'setup' ? (
                     ([0, 1] as const).map(idx => {
                       const slot = (idx === 0 ? 'attack0' : 'attack1') as SetupSlot;
-                      const occupying = setupAttackSlots[idx];
-                      const drop = setupSlotDropProps(slot, occupying);
+                      const occupying = displayAttackSlots[idx];
+                      const drop = setupCommitted ? null : setupSlotDropProps(slot, setupAttackSlots[idx]);
                       return (
                         <div
                           key={slot}
-                          onDragOver={drop.onDragOver}
-                          onDragLeave={drop.onDragLeave}
-                          onDrop={drop.onDrop}
-                          onClick={drop.onClick}
-                          className={`min-w-[3rem] h-16 md:min-w-[3.5rem] md:h-20 cursor-pointer ${
-                            drop.classNameHighlight
+                          onDragOver={drop?.onDragOver}
+                          onDragLeave={drop?.onDragLeave}
+                          onDrop={drop?.onDrop}
+                          onClick={drop?.onClick}
+                          className={`min-w-[3rem] h-16 md:min-w-[3.5rem] md:h-20 ${
+                            setupCommitted ? '' : 'cursor-pointer'
+                          } ${
+                            drop?.classNameHighlight
                               ? 'slot-empty slot-empty--hot'
-                              : 'slot-empty slot-empty--gold'
+                              : occupying
+                                ? ''
+                                : 'slot-empty slot-empty--gold'
                           }`}
                         >
                           {occupying ? (
                             <RenderCard
                               card={occupying}
-                              draggable={canIControl}
-                              onDragStart={(e) => {
+                              draggable={!!canIControl && !setupCommitted}
+                              onDragStart={setupCommitted ? undefined : (e) => {
                                 e.dataTransfer.setData('text/plain', occupying.id);
                                 e.dataTransfer.effectAllowed = 'move';
                                 setSetupDraggingCardId(occupying.id);
                                 clearUISelections();
                               }}
-                              onDragEnd={() => {
+                              onDragEnd={setupCommitted ? undefined : () => {
                                 setSetupDraggingCardId(null);
                                 setSetupDropTarget(null);
                               }}
@@ -1077,14 +1107,14 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
                   <span className="text-[9px] font-bold tracking-wider text-yamabuki-gold/80">我攻</span>
                   <span className="text-sm font-black font-serif text-yamabuki-gold leading-none">
                     {gameState.phase === 'setup'
-                      ? `${[setupAttackSlots[0], setupAttackSlots[1]].filter(Boolean).length}/2`
+                      ? `${[displayAttackSlots[0], displayAttackSlots[1]].filter(Boolean).length}/2`
                       : getAttackValue(bottomPlayer.attackZone)}
                   </span>
                 </div>
                 <div className="flex flex-col min-w-0 sm:hidden text-right">
                   <span className="text-[9px] text-yamabuki-gold/70 font-bold">
                     我攻 {gameState.phase === 'setup'
-                      ? `${[setupAttackSlots[0], setupAttackSlots[1]].filter(Boolean).length}/2`
+                      ? `${[displayAttackSlots[0], displayAttackSlots[1]].filter(Boolean).length}/2`
                       : getAttackValue(bottomPlayer.attackZone)}
                   </span>
                 </div>
@@ -1123,7 +1153,9 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
 
               {/* Wall 1 卡牌 (Apex Y = 25) */}
               {(() => {
-                const wallDrop = gameState.phase === 'setup' ? setupSlotDropProps('wall1', setupWall1) : null;
+                const wallDrop = gameState.phase === 'setup' && !setupCommitted
+                  ? setupSlotDropProps('wall1', setupWall1)
+                  : null;
                 return (
               <div 
                 className={`absolute left-1/2 -translate-x-1/2 flex flex-col items-center cursor-pointer transition-all ${selectedWallIndex === 0 ? 'scale-102' : ''} ${wallDrop?.classNameHighlight ? 'drop-shadow-[0_0_12px_rgba(212,175,55,0.45)]' : ''}`}
@@ -1132,7 +1164,7 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
                 onDragLeave={wallDrop?.onDragLeave}
                 onDrop={wallDrop?.onDrop}
                 onClick={() => {
-                  if (gameState.phase === 'setup') {
+                  if (gameState.phase === 'setup' && !setupCommitted) {
                     handleSetupSlotInteract('wall1', setupWall1);
                     return;
                   }
@@ -1150,7 +1182,11 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
                 }`}>
                   <span>首關</span>
                   {gameState.phase === 'setup' ? (
-                    <span>{setupWall1 ? getCardValueLabel(setupWall1.value) : '放置'}</span>
+                    <span>
+                      {displayWall1
+                        ? (setupCommitted ? '已部署' : getCardValueLabel(displayWall1.value))
+                        : '放置'}
+                    </span>
                   ) : bottomPlayer.walls[0].breached ? (
                     <span className="font-bold">破</span>
                   ) : (
@@ -1159,17 +1195,17 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
                 </div>
                 <div className="flex gap-1 mt-1 justify-center items-center scale-90 origin-top min-h-[4.5rem]">
                   {gameState.phase === 'setup' ? (
-                    setupWall1 ? (
+                    displayWall1 ? (
                       <RenderCard
-                        card={setupWall1}
-                        draggable={canIControl}
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData('text/plain', setupWall1.id);
+                        card={displayWall1}
+                        draggable={!!canIControl && !setupCommitted}
+                        onDragStart={setupCommitted ? undefined : (e) => {
+                          e.dataTransfer.setData('text/plain', displayWall1.id);
                           e.dataTransfer.effectAllowed = 'move';
-                          setSetupDraggingCardId(setupWall1.id);
+                          setSetupDraggingCardId(displayWall1.id);
                           clearUISelections();
                         }}
-                        onDragEnd={() => {
+                        onDragEnd={setupCommitted ? undefined : () => {
                           setSetupDraggingCardId(null);
                           setSetupDropTarget(null);
                         }}
@@ -1191,7 +1227,9 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
 
               {/* Wall 2 卡牌 (Apex Y = 90) */}
               {(() => {
-                const wallDrop = gameState.phase === 'setup' ? setupSlotDropProps('wall2', setupWall2) : null;
+                const wallDrop = gameState.phase === 'setup' && !setupCommitted
+                  ? setupSlotDropProps('wall2', setupWall2)
+                  : null;
                 return (
               <div 
                 className={`absolute left-1/2 -translate-x-1/2 flex flex-col items-center cursor-pointer transition-all ${selectedWallIndex === 1 ? 'scale-102' : ''} ${wallDrop?.classNameHighlight ? 'drop-shadow-[0_0_12px_rgba(212,175,55,0.45)]' : ''}`}
@@ -1200,7 +1238,7 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
                 onDragLeave={wallDrop?.onDragLeave}
                 onDrop={wallDrop?.onDrop}
                 onClick={() => {
-                  if (gameState.phase === 'setup') {
+                  if (gameState.phase === 'setup' && !setupCommitted) {
                     handleSetupSlotInteract('wall2', setupWall2);
                     return;
                   }
@@ -1218,7 +1256,11 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
                 }`}>
                   <span>二關</span>
                   {gameState.phase === 'setup' ? (
-                    <span>{setupWall2 ? getCardValueLabel(setupWall2.value) : '放置'}</span>
+                    <span>
+                      {displayWall2
+                        ? (setupCommitted ? '已部署' : getCardValueLabel(displayWall2.value))
+                        : '放置'}
+                    </span>
                   ) : bottomPlayer.walls[1].breached ? (
                     <span className="font-bold">破</span>
                   ) : (
@@ -1227,17 +1269,17 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
                 </div>
                 <div className="flex gap-1 mt-1 justify-center items-center scale-90 origin-top min-h-[4.5rem]">
                   {gameState.phase === 'setup' ? (
-                    setupWall2 ? (
+                    displayWall2 ? (
                       <RenderCard
-                        card={setupWall2}
-                        draggable={canIControl}
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData('text/plain', setupWall2.id);
+                        card={displayWall2}
+                        draggable={!!canIControl && !setupCommitted}
+                        onDragStart={setupCommitted ? undefined : (e) => {
+                          e.dataTransfer.setData('text/plain', displayWall2.id);
                           e.dataTransfer.effectAllowed = 'move';
-                          setSetupDraggingCardId(setupWall2.id);
+                          setSetupDraggingCardId(displayWall2.id);
                           clearUISelections();
                         }}
-                        onDragEnd={() => {
+                        onDragEnd={setupCommitted ? undefined : () => {
                           setSetupDraggingCardId(null);
                           setSetupDropTarget(null);
                         }}
@@ -1259,7 +1301,9 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
 
               {/* Wall 3 卡牌 (Apex Y = 155) */}
               {(() => {
-                const wallDrop = gameState.phase === 'setup' ? setupSlotDropProps('wall3', setupWall3) : null;
+                const wallDrop = gameState.phase === 'setup' && !setupCommitted
+                  ? setupSlotDropProps('wall3', setupWall3)
+                  : null;
                 return (
               <div 
                 className={`absolute left-1/2 -translate-x-1/2 flex flex-col items-center cursor-pointer transition-all ${selectedWallIndex === 2 ? 'scale-102' : ''} ${wallDrop?.classNameHighlight ? 'drop-shadow-[0_0_12px_rgba(212,175,55,0.45)]' : ''}`}
@@ -1268,7 +1312,7 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
                 onDragLeave={wallDrop?.onDragLeave}
                 onDrop={wallDrop?.onDrop}
                 onClick={() => {
-                  if (gameState.phase === 'setup') {
+                  if (gameState.phase === 'setup' && !setupCommitted) {
                     handleSetupSlotInteract('wall3', setupWall3);
                     return;
                   }
@@ -1286,7 +1330,11 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
                 }`}>
                   <span>本丸</span>
                   {gameState.phase === 'setup' ? (
-                    <span>{setupWall3 ? getCardValueLabel(setupWall3.value) : '放置'}</span>
+                    <span>
+                      {displayWall3
+                        ? (setupCommitted ? '已部署' : getCardValueLabel(displayWall3.value))
+                        : '放置'}
+                    </span>
                   ) : bottomPlayer.walls[2].breached ? (
                     <span className="font-bold">破</span>
                   ) : (
@@ -1295,17 +1343,17 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
                 </div>
                 <div className="flex gap-1 mt-1 justify-center items-center scale-90 origin-top min-h-[4.5rem]">
                   {gameState.phase === 'setup' ? (
-                    setupWall3 ? (
+                    displayWall3 ? (
                       <RenderCard
-                        card={setupWall3}
-                        draggable={canIControl}
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData('text/plain', setupWall3.id);
+                        card={displayWall3}
+                        draggable={!!canIControl && !setupCommitted}
+                        onDragStart={setupCommitted ? undefined : (e) => {
+                          e.dataTransfer.setData('text/plain', displayWall3.id);
                           e.dataTransfer.effectAllowed = 'move';
-                          setSetupDraggingCardId(setupWall3.id);
+                          setSetupDraggingCardId(displayWall3.id);
                           clearUISelections();
                         }}
-                        onDragEnd={() => {
+                        onDragEnd={setupCommitted ? undefined : () => {
                           setSetupDraggingCardId(null);
                           setSetupDropTarget(null);
                         }}
@@ -1331,15 +1379,21 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
               <div className="player-chip">
                 <span className="w-2 h-2 rounded-full bg-yamabuki-gold"></span>
                 <span className="text-xs font-semibold text-foreground/80">
-                  {gameState.phase === 'setup' ? '待派卡牌' : `${bottomPlayer.email} · 手牌`}
+                  {gameState.phase === 'setup'
+                    ? (setupCommitted ? '剩餘手牌' : '待派卡牌')
+                    : `${bottomPlayer.email} · 手牌`}
                 </span>
-                {gameState.phase !== 'setup' && (
-                  <span className="text-[9px] text-foreground/40">上限 8</span>
+                {(gameState.phase !== 'setup' || setupCommitted) && (
+                  <span className="text-[9px] text-foreground/40">
+                    {setupCommitted ? `${bottomPlayer.hand.length} 張` : '上限 8'}
+                  </span>
                 )}
               </div>
               {gameState.phase === 'setup' && (
                 <span className="text-[10px] text-yamabuki-gold/80 font-mono tracking-wide">
-                  {[setupWall1, setupWall2, setupWall3, setupAttackSlots[0], setupAttackSlots[1]].filter(Boolean).length}/5
+                  {setupCommitted
+                    ? '5/5'
+                    : `${[setupWall1, setupWall2, setupWall3, setupAttackSlots[0], setupAttackSlots[1]].filter(Boolean).length}/5`}
                 </span>
               )}
               {replaceAttackIds.length > 0 && (
@@ -1352,27 +1406,35 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
             {/* 手牌展示與選取區 */}
             <div
               className={`hand-tray flex space-x-2 overflow-x-auto py-3 px-2 min-h-[96px] justify-center ${
-                gameState.phase === 'setup' && setupDropTarget === 'hand' ? 'hand-tray--drop' : ''
+                gameState.phase === 'setup' && !setupCommitted && setupDropTarget === 'hand' ? 'hand-tray--drop' : ''
               }`}
               onDragOver={(e) => {
-                if (gameState.phase !== 'setup' || !canIControl) return;
+                if (gameState.phase !== 'setup' || setupCommitted || !canIControl) return;
                 e.preventDefault();
                 setSetupDropTarget('hand');
               }}
               onDragLeave={() => setSetupDropTarget(prev => (prev === 'hand' ? null : prev))}
               onDrop={(e) => {
-                if (gameState.phase !== 'setup') return;
+                if (gameState.phase !== 'setup' || setupCommitted) return;
                 e.preventDefault();
                 const cardId = e.dataTransfer.getData('text/plain') || setupDraggingCardId;
                 if (cardId) returnSetupCardToHand(cardId);
               }}
               onClick={() => {
-                if (gameState.phase === 'setup' && setupSelectedCardId && setupUsedIds.has(setupSelectedCardId)) {
+                if (gameState.phase === 'setup' && !setupCommitted && setupSelectedCardId && setupUsedIds.has(setupSelectedCardId)) {
                   returnSetupCardToHand(setupSelectedCardId);
                 }
               }}
             >
-              {gameState.phase === 'setup' && setupAvailableDraft.map(card => {
+              {gameState.phase === 'setup' && setupCommitted && bottomPlayer.hand.map(card => (
+                <RenderCard key={card.id} card={card} />
+              ))}
+              {gameState.phase === 'setup' && setupCommitted && bottomPlayer.hand.length === 0 && (
+                <span className="text-xs text-yamabuki-gold/70 italic self-center py-4">
+                  已就緒，等待對手完成配置
+                </span>
+              )}
+              {gameState.phase === 'setup' && !setupCommitted && setupAvailableDraft.map(card => {
                 const isSelected = selectedHandCardIds.includes(card.id);
                 return (
                   <RenderCard
@@ -1404,7 +1466,7 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
                   />
                 );
               })}
-              {gameState.phase === 'setup' && setupAvailableDraft.length === 0 && (
+              {gameState.phase === 'setup' && !setupCommitted && setupAvailableDraft.length === 0 && (
                 <span className="text-xs text-yamabuki-gold/70 italic self-center py-4">
                   五張已就位，點右下角確認部署
                 </span>
