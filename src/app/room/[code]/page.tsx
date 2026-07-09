@@ -5,11 +5,11 @@ import { useRouter } from 'next/navigation';
 import { useGameStore } from '@/store/useGameStore';
 import { Card } from '@/lib/game/types';
 import { getAttackValue, getWallDefenseValue, WALL_LIMITS } from '@/lib/game/engine';
-import { computeSpotlight } from '@/lib/game/ui-step';
+import { computeSpotlight, computeBreachGuide } from '@/lib/game/ui-step';
 import { ArrowLeft, RotateCcw, Eye, Sword } from 'lucide-react';
 import {
   GameCard, WallArc, SiegeAxis, HandDock, ActionDock,
-  LogDrawer, WaitingRoom, DiscardPileModal,
+  LogDrawer, WaitingRoom, DiscardPileModal, BreachGuideBar,
 } from '@/components/game';
 
 export default function GameRoomPage({ params: paramsPromise }: { params: Promise<{ code: string }> }) {
@@ -219,6 +219,19 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
     hasDoneExtraAction: gameState.hasDoneExtraAction,
   });
 
+  const isBreachPhase =
+    gameState.phase === 'wall_breached_response' && !!gameState.breachedResponseState;
+  const breachedWallIndex = gameState.breachedResponseState?.breachedWallIndex ?? 0;
+  const breachWallNames = ['首關', '二關', '本丸'] as const;
+  const breachGuide = isBreachPhase
+    ? computeBreachGuide({
+        canIControl,
+        selectedHandCount: selectedHandCardIds.length,
+        selectedWallIndex,
+        breachedWallIndex,
+      })
+    : null;
+
   const attackReady = selectedHandCardIds.length >= 1 && selectedHandCardIds.length <= 2;
   const defenseReady =
     selectedHandCardIds.length >= 1 &&
@@ -342,7 +355,10 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
     setMainActionIntent(null);
   });
 
-  const handleDraw2 = () => runAction(async () => { await submitAction(code, 'draw', {}); });
+  const handleDraw2 = () => runAction(async () => {
+    await submitAction(code, 'draw', {});
+    setExtraActionType('none');
+  });
 
   const handleAttack = () => runAction(async () => { await submitAction(code, 'attack', {}); });
 
@@ -398,7 +414,9 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
 
   const handInfoLabel = gameState.phase === 'setup'
     ? (setupCommitted ? '就緒' : '手牌')
-    : '手牌';
+    : isBreachPhase && canIControl
+      ? '選補防牌'
+      : '手牌';
 
   const handEmptyMessage = gameState.phase === 'setup'
     ? (setupCommitted ? '等待對手' : '拖放部署')
@@ -567,6 +585,7 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
           onSetupCardDragEnd={() => { setSetupDraggingCardId(null); setSetupDropTarget(null); }}
           mySetupReady={mySetupReady}
           isLocalGuest={isLocalGuest}
+          breachGuideMessage={breachGuide?.message}
           phaseDeadlineAt={gameState.phaseDeadlineAt}
           onTimerExpire={handleTimerExpire}
           guideHighlight={spotlight === 'attack-zone'}
@@ -605,8 +624,20 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
           }}
           onCardDragEnd={() => { setSetupDraggingCardId(null); setSetupDropTarget(null); }}
           guideHighlight={spotlight === 'ally-wall'}
+          breachMode={isBreachPhase}
+          breachedWallIndex={isBreachPhase ? breachedWallIndex : null}
         />
       </div>
+
+      {breachGuide && (
+        <BreachGuideBar
+          step={breachGuide.step}
+          stepNo={breachGuide.stepNo}
+          message={breachGuide.message}
+          breachedWallName={breachWallNames[breachedWallIndex] ?? '城牆'}
+          canIControl={canIControl}
+        />
+      )}
 
       <ActionDock
         phase={gameState.phase}

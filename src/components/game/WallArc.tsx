@@ -46,6 +46,10 @@ export interface WallArcProps {
 
   /** 引導高亮 */
   guideHighlight?: boolean;
+
+  /** 城破補防 */
+  breachMode?: boolean;
+  breachedWallIndex?: number | null;
 }
 
 export function WallArc(props: WallArcProps) {
@@ -56,8 +60,10 @@ export function WallArc(props: WallArcProps) {
     onEnemyCardClick,
     selectedWallIndex, onAllyWallClick,
     setupCommitted = false, displayCards, setupIsPlacing = false,
-    setupSlotDropProps, onCardDragStart, onCardDragEnd,
+    setupSlotDropProps,     onCardDragStart, onCardDragEnd,
     guideHighlight = false,
+    breachMode = false,
+    breachedWallIndex = null,
   } = props;
 
   const isSetup = phase === 'setup';
@@ -68,13 +74,22 @@ export function WallArc(props: WallArcProps) {
         {TIER_ORDER.map((wallIndex) => {
           const wall = walls[wallIndex];
           const isFrontline = wallIndex === 0 && turnCount > 1;
+          const isBreachRuin = breachMode && breachedWallIndex === wallIndex;
+          const isBreachPlaceable =
+            breachMode &&
+            side === 'ally' &&
+            canIControl &&
+            !wall.breached &&
+            breachedWallIndex !== wallIndex;
 
           return (
             <div
               key={wallIndex}
               className={`wall-tier ${
                 isFrontline && side === 'enemy' && !wall.breached ? 'wall-tier--frontline' : ''
-              }`}
+              } ${isBreachRuin ? 'wall-tier--breach-ruin' : ''} ${
+                isBreachPlaceable ? 'wall-tier--breach-placeable' : ''
+              } ${isBreachPlaceable && selectedWallIndex === wallIndex ? 'wall-tier--breach-selected' : ''}`}
             >
               {side === 'enemy' ? (
                 <EnemyBadge wall={wall} wallIndex={wallIndex} wallLimit={wallLimits[wallIndex]} isFrontline={isFrontline} />
@@ -102,14 +117,14 @@ export function WallArc(props: WallArcProps) {
                     : ''
                 }`}
                 onClick={
-                  side === 'ally' && !isSetup && !wall.breached
+                  side === 'ally' && !isSetup && !wall.breached && !isBreachRuin
                     ? () => onAllyWallClick?.(wallIndex)
                     : undefined
                 }
               >
                 {side === 'enemy'
                   ? renderEnemyCards(wall, wallIndex, extraActionType, canIControl, selectedOpponentWallIndex ?? null, selectedOpponentWallCardIndexes, onEnemyCardClick)
-                  : renderAllyCards(wall, wallIndex, isSetup, setupCommitted, displayCards, canIControl, setupSlotDropProps, onCardDragStart, onCardDragEnd)
+                  : renderAllyCards(wall, wallIndex, isSetup, setupCommitted, displayCards, canIControl, setupSlotDropProps, onCardDragStart, onCardDragEnd, isBreachRuin)
                 }
               </div>
             </div>
@@ -240,6 +255,7 @@ function renderAllyCards(
   setupSlotDropProps?: WallArcProps['setupSlotDropProps'],
   onCardDragStart?: (id: string, e: React.DragEvent) => void,
   onCardDragEnd?: () => void,
+  isBreachRuin = false,
 ) {
   if (isSetup && !setupCommitted) {
     const slotName = `wall${wallIndex + 1}` as 'wall1' | 'wall2' | 'wall3';
@@ -275,7 +291,16 @@ function renderAllyCards(
     return displayCard ? <GameCard card={displayCard} /> : null;
   }
 
-  if (wall.breached) return null;
+  if (wall.breached) {
+    if (isBreachRuin) {
+      return (
+        <div className="wall-tier__ruin slot-card" aria-label="破口，無法放置">
+          <span className="wall-tier__ruin-label">破口</span>
+        </div>
+      );
+    }
+    return null;
+  }
 
   return wall.cards.map((card, cardIdx) => (
     <GameCard

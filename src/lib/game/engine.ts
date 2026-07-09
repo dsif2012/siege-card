@@ -537,7 +537,7 @@ export function drawTwoCards(state: GameState, playerId: string): GameState {
   state.logs.push(`【額外行動】玩家 ${player.email} 執行抽卡，抽了 ${drawn.length} 張牌。`);
   state.hasDoneExtraAction = true;
 
-  return state;
+  return advanceAfterExtraAction(state, playerId);
 }
 
 // 6. 額外行動 2：偵查（查看對方 1~2 張蓋牌防禦牌，並永久公開）

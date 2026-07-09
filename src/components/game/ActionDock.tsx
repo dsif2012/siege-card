@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import type { GamePhase } from '@/lib/game/types';
-import { Sword, Shield, Sparkles, Layers, Eye, Zap, Crosshair } from 'lucide-react';
+import { Sword, Swords, Shield, Sparkles, Layers, Eye, Zap } from 'lucide-react';
 
 export type MainActionIntent = 'attack' | 'defense' | 'charge' | null;
 
@@ -142,7 +142,7 @@ export function ActionDock(props: ActionDockProps) {
           />
           <ActionIcon
             label="城"
-            icon={<Crosshair className="w-5 h-5" />}
+            icon={<Swords className="w-5 h-5" />}
             onClick={onAttack}
             disabled={turnCount === 1}
           />

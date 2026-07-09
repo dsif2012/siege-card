@@ -1,17 +1,12 @@
 'use client';
 
 import React from 'react';
+import { Swords } from 'lucide-react';
 import type { Card, AttackCard, GamePhase } from '@/lib/game/types';
 import { getAttackValue } from '@/lib/game/engine';
 import { hubPhaseLabel } from '@/lib/game/ui-step';
 import { GameCard } from './GameCard';
 import { TurnTimer } from './TurnTimer';
-
-const SWORD_ICON = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-    <path d="M14.5 3.5 L20.5 9.5 L18 12 L16.5 10.5 L13.5 13.5 L15 15 L12.5 17.5 L9.5 14.5 L4 20 L3 19 L8.5 13.5 L5.5 10.5 L8 8 L9.5 9.5 L12.5 6.5 L11 5 Z" />
-  </svg>
-);
 
 function SiegeLaneBadge({
   side,
@@ -25,7 +20,7 @@ function SiegeLaneBadge({
   return (
     <div className={`siege-axis__badge siege-axis__badge--${side}`}>
       <div className={`siege-axis__badge-icon siege-axis__badge-icon--${side}`}>
-        {SWORD_ICON}
+        <Swords size={14} strokeWidth={2.25} aria-hidden />
       </div>
       <div className="siege-axis__badge-meta">
         <span className="siege-axis__badge-label">{label}</span>
@@ -72,6 +67,8 @@ export interface SiegeAxisProps {
   mySetupReady: boolean;
   isLocalGuest: boolean;
 
+  breachGuideMessage?: string | null;
+
   phaseDeadlineAt?: number;
   onTimerExpire?: () => void;
 
@@ -88,6 +85,7 @@ export function SiegeAxis(props: SiegeAxisProps) {
     setupCommitted, displayAttackSlots, setupSlotDropProps,
     onSetupCardDragStart, onSetupCardDragEnd,
     mySetupReady, isLocalGuest,
+    breachGuideMessage,
     phaseDeadlineAt, onTimerExpire,
     guideHighlight = false,
   } = props;
@@ -99,6 +97,9 @@ export function SiegeAxis(props: SiegeAxisProps) {
   const phaseLabel = hubPhaseLabel(phase);
   const turnHint = (() => {
     if (phase === 'finished') return null;
+    if (phase === 'wall_breached_response' && breachGuideMessage) {
+      return breachGuideMessage;
+    }
     if (isSetup) {
       if (mySetupReady && !isLocalGuest) return '已就緒，等待對手';
       return canIControl ? '輪到你配置' : '對手配置中';
@@ -194,7 +195,9 @@ export function SiegeAxis(props: SiegeAxisProps) {
               </div>
             </div>
             {turnHint && (
-              <span className={`axis-hub__turn ${canIControl ? 'axis-hub__turn--mine' : ''}`}>
+              <span className={`axis-hub__turn ${canIControl ? 'axis-hub__turn--mine' : ''} ${
+                phase === 'wall_breached_response' ? 'axis-hub__turn--breach' : ''
+              }`}>
                 {turnHint}
               </span>
             )}
