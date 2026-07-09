@@ -1,0 +1,38 @@
+// 這是 Prisma Schema 設定檔，定義資料庫模型
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  
+  // 關聯欄位：一位使用者可以作為房主、客場玩家或獲勝者
+  roomsAsPlayer1 Room[] @relation("Player1Relation")
+  roomsAsPlayer2 Room[] @relation("Player2Relation")
+  wonRooms       Room[] @relation("WinnerRelation")
+}
+
+model Room {
+  id          String   @id @default(uuid())
+  code        String   @unique // 6碼大寫隨機邀請碼
+  player1Id   String
+  player2Id   String?  // 可為空，表示等待玩家加入或使用本機 Guest 模式
+  status      String   // WAITING, PLAYING, FINISHED
+  gameState   Json?    // 儲存完整的遊戲狀態 (包含牌堆、手牌、城牆防禦、攻擊區等)
+  winnerId    String?  // 獲勝玩家的 ID
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  player1 User  @relation("Player1Relation", fields: [player1Id], references: [id], onDelete: Cascade)
+  player2 User? @relation("Player2Relation", fields: [player2Id], references: [id], onDelete: SetNull)
+  winner  User? @relation("WinnerRelation", fields: [winnerId], references: [id], onDelete: SetNull)
+}

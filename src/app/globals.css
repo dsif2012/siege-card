@@ -1,0 +1,82 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700;900&family=Outfit:wght@300;400;600;800&display=swap');
+@import "tailwindcss";
+
+/* 匯入日系優雅的 Noto Serif TC (思源宋體) 字型 */
+
+:root {
+  --background: #111113; /* 深炭色 */
+  --foreground: #f5f4ef; /* 胡粉白 */
+  --shiko-red: #d33f49;  /* 朱砂紅 */
+  --yamabuki-gold: #d4af37; /* 山吹金 */
+}
+
+@theme {
+  --color-shiko-red: #d33f49;
+  --color-yamabuki-gold: #d4af37;
+  --font-serif: "Noto Serif TC", serif;
+  --font-sans: "Outfit", Arial, Helvetica, sans-serif;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  background-image: 
+    radial-gradient(circle at 50% 0%, rgba(211, 63, 73, 0.08) 0%, transparent 60%),
+    radial-gradient(circle at 100% 100%, rgba(212, 175, 55, 0.04) 0%, transparent 50%);
+  background-attachment: fixed;
+}
+
+/* 日系和紙質感效果 */
+.washi-paper {
+  background-color: #1a1a1e;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 0);
+  background-size: 8px 8px;
+  border: 1px solid rgba(245, 244, 239, 0.08);
+}
+
+/* 和紙卡牌質感 (亮) */
+.washi-card-light {
+  background-color: #f7f5f0;
+  background-image: radial-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 0);
+  background-size: 6px 6px;
+  color: #1c1c1f;
+}
+
+/* 蓄力金色火焰微光效果 */
+@keyframes gold-glow {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(212, 175, 55, 0.3), inset 0 0 2px rgba(212, 175, 55, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(212, 175, 55, 0.7), inset 0 0 6px rgba(212, 175, 55, 0.4);
+  }
+}
+
+.charge-glow {
+  animation: gold-glow 2s infinite ease-in-out;
+}
+
+/* 櫻花/和風紋路背景 */
+.japanese-pattern {
+  background-color: #3b1115;
+  background-image: 
+    radial-gradient(circle at 100% 150%, #3b1115 24%, #4c171c 24%, #4c171c 28%, #3b1115 28%, #3b1115 36%, #4c171c 36%, #4c171c 40%, transparent 40%, transparent),
+    radial-gradient(circle at 0% 150%, #3b1115 24%, #4c171c 24%, #4c171c 28%, #3b1115 28%, #3b1115 36%, #4c171c 36%, #4c171c 40%, transparent 40%, transparent);
+  background-size: 20px 20px;
+}
+
+/* 自訂捲軸樣式 (日式簡約) */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(211, 63, 73, 0.3);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(211, 63, 73, 0.6);
+}
