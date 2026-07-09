@@ -41,6 +41,8 @@ export interface SiegeAxisProps {
   mySetupReady: boolean;
   isLocalGuest: boolean;
   activeActorName: string;
+
+  guideHighlight?: boolean;
 }
 
 export function SiegeAxis(props: SiegeAxisProps) {
@@ -53,6 +55,7 @@ export function SiegeAxis(props: SiegeAxisProps) {
     setupCommitted, displayAttackSlots, setupSlotDropProps,
     onSetupCardDragStart, onSetupCardDragEnd,
     mySetupReady, isLocalGuest, activeActorName,
+    guideHighlight = false,
   } = props;
 
   const isSetup = phase === 'setup';
@@ -60,7 +63,7 @@ export function SiegeAxis(props: SiegeAxisProps) {
   const bottomPlayerKey = isP2View ? 'player2' : 'player1';
 
   return (
-    <div className="siege-axis">
+    <div className={`siege-axis ${guideHighlight ? 'guide-target' : ''}`}>
       {/* SVG decorative overlay */}
       <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden>
         <defs>

@@ -40,6 +40,7 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
 
   const [replaceAttackIds, setReplaceAttackIds] = useState<string[]>([]);
   const [extraActionType, setExtraActionType] = useState<'scout' | 'disrupt' | 'none'>('none');
+  const [mainActionIntent, setMainActionIntent] = useState<'attack' | 'defense' | 'charge' | null>(null);
   const [isLogOpen, setIsLogOpen] = useState(false);
 
   const lastActorIdRef = useRef<string | null>(null);
@@ -111,6 +112,13 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
     setSetupDraggingCardId(null); setSetupDropTarget(null);
     clearUISelections();
   }, [activeActorId, gameState?.phase, gameState?.player2.id, clearUISelections]);
+
+  useEffect(() => {
+    setMainActionIntent(null);
+    setExtraActionType('none');
+    setReplaceAttackIds([]);
+    clearUISelections();
+  }, [gameState?.phase, gameState?.activePlayerId, clearUISelections]);
 
   /* ═══ Early returns ═══ */
 
@@ -201,6 +209,34 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
 
   const wallLimits = [...WALL_LIMITS];
 
+  const guideTarget = (() => {
+    if (!canIControl) return null as null | 'actions' | 'hand' | 'ally-wall' | 'enemy-wall' | 'attack-zone';
+    if (gameState.phase === 'main_action') {
+      if (!mainActionIntent) return 'actions';
+      if (mainActionIntent === 'attack') return 'hand';
+      if (mainActionIntent === 'defense') {
+        if (selectedHandCardIds.length < 1) return 'hand';
+        if (selectedWallIndex === null) return 'ally-wall';
+        return null;
+      }
+      return null;
+    }
+    if (gameState.phase === 'extra_action') {
+      if (extraActionType === 'none') return 'actions';
+      if (extraActionType === 'scout') return 'enemy-wall';
+      if (extraActionType === 'disrupt') {
+        if (selectedOpponentWallCardIndexes.length < 1) return 'enemy-wall';
+        if (selectedDisruptAttackCards.length < 1) return 'attack-zone';
+        return null;
+      }
+    }
+    if (gameState.phase === 'wall_breached_response') {
+      if (selectedHandCardIds.length < 1) return 'hand';
+      if (selectedWallIndex === null) return 'ally-wall';
+    }
+    return null;
+  })();
+
   /* ═══ Setup helpers ═══ */
 
   const findSetupCard = (cardId: string): Card | undefined => setupDraftCards?.find(c => c.id === cardId);
@@ -290,6 +326,7 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
         replaceIds: replaceAttackIds.length > 0 ? replaceAttackIds : undefined,
       });
       setReplaceAttackIds([]);
+      setMainActionIntent(null);
     } catch (e: any) { alert(e.message || '行動失敗'); }
   };
 
@@ -298,11 +335,15 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
     if (selectedWallIndex === null) { alert('請在下方己方城牆區域選擇要補防的城牆 (Wall 1 ~ 3)'); return; }
     try {
       await submitAction(code, 'place_defense', { wallIndex: selectedWallIndex, cardIds: selectedHandCardIds });
+      setMainActionIntent(null);
     } catch (e: any) { alert(e.message || '行動失敗'); }
   };
 
   const handleCharge = async () => {
-    try { await submitAction(code, 'charge', {}); } catch (e: any) { alert(e.message || '行動失敗'); }
+    try {
+      await submitAction(code, 'charge', {});
+      setMainActionIntent(null);
+    } catch (e: any) { alert(e.message || '行動失敗'); }
   };
 
   const handleDraw2 = async () => {
@@ -420,10 +461,12 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
         mySetupReady={mySetupReady}
         isLocalGuest={isLocalGuest}
         setupCommitted={setupCommitted}
+        mainActionIntent={mainActionIntent}
+        extraActionType={extraActionType}
       />
 
       {/* Scrollable Battlefield */}
-      <div className="siege-board">
+      <div className={`siege-board ${guideTarget ? `siege-board--guide-${guideTarget}` : ''}`}>
         {/* Enemy info */}
         <div className="flex items-center justify-between px-1">
           <div className="player-chip">
@@ -450,6 +493,7 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
           selectedOpponentWallIndex={selectedOpponentWallIndex}
           selectedOpponentWallCardIndexes={selectedOpponentWallCardIndexes}
           onEnemyCardClick={(wallIndex, cardIndex) => toggleOpponentCardSelection(wallIndex, cardIndex)}
+          guideHighlight={guideTarget === 'enemy-wall'}
         />
 
         {/* Siege Axis */}
@@ -467,6 +511,7 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
           onDisruptCardClick={toggleDisruptAttackCardSelection}
           replaceAttackIds={replaceAttackIds}
           onReplaceToggle={(cardId) => {
+            if (mainActionIntent !== 'attack' && gameState.phase === 'main_action') return;
             if (replaceAttackIds.includes(cardId)) setReplaceAttackIds(replaceAttackIds.filter(id => id !== cardId));
             else if (replaceAttackIds.length >= 2) setReplaceAttackIds([replaceAttackIds[1], cardId]);
             else setReplaceAttackIds([...replaceAttackIds, cardId]);
@@ -484,6 +529,7 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
           mySetupReady={mySetupReady}
           isLocalGuest={isLocalGuest}
           activeActorName={activeActorName}
+          guideHighlight={guideTarget === 'attack-zone'}
         />
 
         {/* Ally Walls */}
@@ -501,6 +547,7 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
               handleSetupSlotInteract(slotName, [setupWall1, setupWall2, setupWall3][wallIndex]);
               return;
             }
+            if (gameState.phase === 'main_action' && mainActionIntent !== 'defense') return;
             if (canIControl && !bottomPlayer.walls[wallIndex].breached) {
               selectWallIndex(selectedWallIndex === wallIndex ? null : wallIndex);
             }
@@ -516,6 +563,7 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
             clearUISelections();
           }}
           onCardDragEnd={() => { setSetupDraggingCardId(null); setSetupDropTarget(null); }}
+          guideHighlight={guideTarget === 'ally-wall'}
         />
       </div>
 
@@ -528,9 +576,12 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
           if (isSetupDraft) {
             if (selectedHandCardIds.includes(cardId)) clearUISelections();
             else { clearUISelections(); toggleHandCardSelection(cardId); }
-          } else {
-            toggleHandCardSelection(cardId);
+            return;
           }
+          if (gameState.phase === 'main_action') {
+            if (mainActionIntent !== 'attack' && mainActionIntent !== 'defense') return;
+          }
+          toggleHandCardSelection(cardId);
         }}
         emptyMessage={handEmptyMessage}
         infoLabel={handInfoLabel}
@@ -560,6 +611,7 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
           }
         }}
         replaceCount={replaceAttackIds.length > 0 ? replaceAttackIds.length : undefined}
+        guideHighlight={guideTarget === 'hand'}
         trailingAction={
           gameState.phase === 'setup' ? (
             setupCommitted ? (
@@ -585,6 +637,11 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
           setupIsReady={setupIsReady}
           setupCommitted={setupCommitted}
           onSetupSubmit={handleSetupSubmit}
+          mainActionIntent={mainActionIntent}
+          setMainActionIntent={setMainActionIntent}
+          selectedHandCount={selectedHandCardIds.length}
+          selectedWallIndex={selectedWallIndex}
+          replaceAttackCount={replaceAttackIds.length}
           onPlaceAttack={handlePlaceAttack}
           onPlaceDefense={handlePlaceDefense}
           onCharge={handleCharge}
@@ -592,6 +649,8 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
           setExtraActionType={setExtraActionType}
           hasDoneExtraAction={gameState.hasDoneExtraAction}
           turnCount={gameState.turnCount}
+          selectedOpponentCardCount={selectedOpponentWallCardIndexes.length}
+          selectedDisruptAttackCount={selectedDisruptAttackCards.length}
           onDraw2={handleDraw2}
           onAttack={handleAttack}
           onScout={handleScout}

@@ -27,6 +27,9 @@ interface HandDockProps {
   infoLabel?: string;
   replaceCount?: number;
 
+  /** 引導高亮：目前應選手牌 */
+  guideHighlight?: boolean;
+
   /** 右側操作（如確認部署），併入底欄避免多佔一列 */
   trailingAction?: React.ReactNode;
 }
@@ -35,10 +38,10 @@ export function HandDock({
   cards, selectedCardIds, canIControl, onCardClick, emptyMessage,
   isDraggable, onDragStart, onDragEnd,
   isDropTarget, onHandDragOver, onHandDragLeave, onHandDrop, onHandClick,
-  infoLabel, replaceCount, trailingAction,
+  infoLabel, replaceCount, trailingAction, guideHighlight,
 }: HandDockProps) {
   return (
-    <div className="hand-dock-wrap">
+    <div className={`hand-dock-wrap ${guideHighlight ? 'guide-target' : ''}`}>
       <div className="hand-dock-bar">
         <div className="player-chip shrink-0">
           <span className="w-1.5 h-1.5 rounded-full bg-yamabuki-gold" />

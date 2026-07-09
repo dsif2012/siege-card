@@ -54,11 +54,11 @@ export default function LobbyPage() {
       <div className="text-center mb-8 max-w-lg select-none">
         <div className="inline-flex items-center justify-center gap-2 text-shiko-red mb-2 animate-pulse">
           <Sword className="w-5 h-5" />
-          <span className="font-semibold tracking-widest text-sm">二人對策卡牌戰</span>
+          <span className="font-semibold tracking-widest text-sm">雙人對策卡牌戰</span>
           <Shield className="w-5 h-5" />
         </div>
         <h1 className="text-4xl md:text-5xl font-black font-serif tracking-widest text-yamabuki-gold mb-3 drop-shadow-[0_2px_8px_rgba(212,175,55,0.2)]">
-          戰國攻城牌
+          瑪麗亞的城牆
         </h1>
         <p className="text-xs md:text-sm text-foreground/60 tracking-wider">
           —— 兵法蓄力，強攻破防，決勝於方寸城牆 ——

@@ -146,7 +146,8 @@ body {
   flex-shrink: 0;
   display: flex;
   justify-content: center;
-  width: min(100%, calc(var(--card-w) * 7.5));
+  /* 每關至少能並排 2 張補防牌，避免新蓋牌被擠出視野 */
+  width: min(100%, calc(var(--card-w) * 10.5));
   margin-inline: auto;
 }
 
@@ -258,6 +259,73 @@ body {
   background: rgba(12, 12, 14, 0.98);
   max-height: 28vh;
   overflow-y: auto;
+}
+
+.action-dock--await-choice {
+  box-shadow: 0 -10px 28px rgba(212, 175, 55, 0.12);
+}
+
+.guide-step {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  width: 100%;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(212, 175, 55, 0.08);
+  border: 1px solid rgba(212, 175, 55, 0.28);
+  color: rgba(245, 244, 239, 0.85);
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  animation: guide-pulse 1.8s ease-in-out infinite;
+}
+
+.guide-choice {
+  position: relative;
+}
+
+.action-dock--await-choice .guide-choice:not(:disabled) {
+  border-color: rgba(212, 175, 55, 0.45);
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.15), 0 0 16px rgba(212, 175, 55, 0.12);
+  animation: guide-choice-glow 1.8s ease-in-out infinite;
+}
+
+.guide-target {
+  position: relative;
+  outline: 1.5px dashed rgba(212, 175, 55, 0.55);
+  outline-offset: 3px;
+  border-radius: 0.75rem;
+  animation: guide-pulse 1.8s ease-in-out infinite;
+}
+
+.guide-target::after {
+  content: '點這裡';
+  position: absolute;
+  top: -0.7rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(212, 175, 55, 0.95);
+  color: #1a1508;
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+@keyframes guide-pulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.08); }
+}
+
+@keyframes guide-choice-glow {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.15), 0 0 10px rgba(212, 175, 55, 0.08); }
+  50% { box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.35), 0 0 18px rgba(212, 175, 55, 0.22); }
 }
 
 @media (min-width: 640px) {
@@ -595,7 +663,7 @@ body {
 
 .wall-tier__cards {
   display: flex;
-  gap: 0.25rem;
+  gap: 0.3rem;
   justify-content: center;
   align-items: center;
   flex-wrap: wrap;
@@ -607,9 +675,31 @@ body {
   min-height: var(--card-h);
 }
 
+/* 多張防守牌：輕微扇形疊放，補防新牌不會被擠出欄外 */
+.wall-tier__cards--stack {
+  flex-wrap: nowrap;
+  gap: 0;
+  padding-inline: calc(var(--card-w) * 0.12);
+}
+
+.wall-tier__cards--stack > * {
+  margin-left: calc(var(--card-w) * -0.32);
+  position: relative;
+  transition: transform 0.15s ease, z-index 0s;
+}
+
+.wall-tier__cards--stack > *:first-child {
+  margin-left: 0;
+}
+
+.wall-tier__cards--stack > *:hover,
+.wall-tier__cards--stack > *:focus-within {
+  transform: translateY(-0.3rem) scale(1.05);
+  z-index: 3;
+}
+
 @media (min-width: 640px) {
   .wall-tier { padding: 0.25rem 0.2rem; gap: 0.2rem; }
-  .wall-tier__cards { gap: 0.3rem; }
 }
 
 /* ══════════════════════════════════════

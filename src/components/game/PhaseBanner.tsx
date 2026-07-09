@@ -1,6 +1,7 @@
 'use client';
 
 import type { GamePhase } from '@/lib/game/types';
+import type { MainActionIntent } from './ActionDock';
 
 interface PhaseBannerProps {
   phase: GamePhase;
@@ -10,6 +11,8 @@ interface PhaseBannerProps {
   mySetupReady: boolean;
   isLocalGuest: boolean;
   setupCommitted: boolean;
+  mainActionIntent?: MainActionIntent;
+  extraActionType?: 'scout' | 'disrupt' | 'none';
 }
 
 export function PhaseBanner({
@@ -17,9 +20,9 @@ export function PhaseBanner({
   activeActorName,
   canIControl,
   turnCount,
-  mySetupReady,
-  isLocalGuest,
   setupCommitted,
+  mainActionIntent = null,
+  extraActionType = 'none',
 }: PhaseBannerProps) {
   let label = '';
   let detail = '';
@@ -36,20 +39,34 @@ export function PhaseBanner({
     }
   } else if (phase === 'main_action') {
     label = `第 ${turnCount} 回合`;
-    if (canIControl) {
-      detail = '主要行動 · 三選一';
-    } else {
+    if (!canIControl) {
       detail = `${activeActorName} 行動中`;
       colorClass = 'text-foreground/50';
+    } else if (!mainActionIntent) {
+      detail = '① 先選主要行動';
+    } else if (mainActionIntent === 'attack') {
+      detail = '攻擊牌 · 選手牌後確認';
+      colorClass = 'text-shiko-red';
+    } else if (mainActionIntent === 'defense') {
+      detail = '防守牌 · 選手牌＋城牆';
+      colorClass = 'text-sky-300';
+    } else {
+      detail = '蓄力 · 確認即可';
     }
   } else if (phase === 'extra_action') {
     label = `第 ${turnCount} 回合`;
-    if (canIControl) {
-      detail = '額外行動 · 四選一或跳過';
-      colorClass = 'text-sky-300';
-    } else {
+    if (!canIControl) {
       detail = `${activeActorName} 行動中`;
       colorClass = 'text-foreground/50';
+    } else if (extraActionType === 'scout') {
+      detail = '偵查 · 選對手蓋牌';
+      colorClass = 'text-sky-300';
+    } else if (extraActionType === 'disrupt') {
+      detail = '破勢 · 選蓋牌＋攻擊牌';
+      colorClass = 'text-sky-300';
+    } else {
+      detail = '① 先選額外行動或結束';
+      colorClass = 'text-sky-300';
     }
   } else if (phase === 'wall_breached_response') {
     label = '防禦突破';
@@ -67,7 +84,7 @@ export function PhaseBanner({
       {detail && (
         <>
           <span className="text-foreground/20">·</span>
-          <span className="text-foreground/55 truncate max-w-[12rem]">{detail}</span>
+          <span className="text-foreground/55 truncate max-w-[16rem]">{detail}</span>
         </>
       )}
     </div>

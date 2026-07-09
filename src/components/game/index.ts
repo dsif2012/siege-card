@@ -6,7 +6,7 @@ export { SiegeAxis } from './SiegeAxis';
 export type { SiegeAxisProps } from './SiegeAxis';
 export { HandDock } from './HandDock';
 export { ActionDock } from './ActionDock';
-export type { ActionDockProps } from './ActionDock';
+export type { ActionDockProps, MainActionIntent } from './ActionDock';
 export { LogDrawer } from './LogDrawer';
 export { WaitingRoom } from './WaitingRoom';
 export { PhaseBanner } from './PhaseBanner';

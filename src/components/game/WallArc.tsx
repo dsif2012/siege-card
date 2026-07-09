@@ -43,6 +43,9 @@ export interface WallArcProps {
   } | null;
   onCardDragStart?: (cardId: string, e: React.DragEvent) => void;
   onCardDragEnd?: () => void;
+
+  /** 引導高亮 */
+  guideHighlight?: boolean;
 }
 
 export function WallArc(props: WallArcProps) {
@@ -54,12 +57,13 @@ export function WallArc(props: WallArcProps) {
     selectedWallIndex, onAllyWallClick,
     setupCommitted = false, displayCards, setupIsPlacing = false,
     setupSlotDropProps, onCardDragStart, onCardDragEnd,
+    guideHighlight = false,
   } = props;
 
   const isSetup = phase === 'setup';
 
   return (
-    <div className={`wall-stage ${side === 'enemy' ? 'wall-stage--enemy' : 'wall-stage--ally'}`}>
+    <div className={`wall-stage ${side === 'enemy' ? 'wall-stage--enemy' : 'wall-stage--ally'} ${guideHighlight ? 'guide-target' : ''}`}>
       <div className="wall-row" role="group" aria-label={side === 'enemy' ? '敵方城牆' : '己方城牆'}>
         {TIER_ORDER.map((wallIndex) => {
           const wall = walls[wallIndex];
@@ -87,10 +91,25 @@ export function WallArc(props: WallArcProps) {
                 />
               )}
 
-              <div className="wall-tier__cards">
+              <div
+                className={`wall-tier__cards ${
+                  !isSetup && wall.cards.length > 1 ? 'wall-tier__cards--stack' : ''
+                } ${
+                  side === 'ally' && !isSetup && !wall.breached
+                    ? `cursor-pointer rounded-lg p-0.5 transition-all ${
+                        selectedWallIndex === wallIndex ? 'ring-1 ring-yamabuki-gold/40 bg-yamabuki-gold/5' : ''
+                      }`
+                    : ''
+                }`}
+                onClick={
+                  side === 'ally' && !isSetup && !wall.breached
+                    ? () => onAllyWallClick?.(wallIndex)
+                    : undefined
+                }
+              >
                 {side === 'enemy'
                   ? renderEnemyCards(wall, wallIndex, extraActionType, canIControl, selectedOpponentWallIndex ?? null, selectedOpponentWallCardIndexes, onEnemyCardClick)
-                  : renderAllyCards(wall, wallIndex, isSetup, setupCommitted, displayCards, canIControl, setupSlotDropProps, onAllyWallClick, selectedWallIndex ?? null, onCardDragStart, onCardDragEnd)
+                  : renderAllyCards(wall, wallIndex, isSetup, setupCommitted, displayCards, canIControl, setupSlotDropProps, onCardDragStart, onCardDragEnd)
                 }
               </div>
             </div>
@@ -154,7 +173,10 @@ function AllyBadge({
       ) : wall.breached ? (
         <span className="font-bold">破</span>
       ) : (
-        <span>{getWallDefenseValue(wall)}/{wallLimit}</span>
+        <span>
+          {getWallDefenseValue(wall)}/{wallLimit}
+          {wall.cards.length > 1 ? ` ·${wall.cards.length}` : ''}
+        </span>
       )}
     </div>
   );
@@ -199,8 +221,6 @@ function renderAllyCards(
   displayCards?: (Card | null)[],
   canIControl?: boolean,
   setupSlotDropProps?: WallArcProps['setupSlotDropProps'],
-  onAllyWallClick?: (wi: number) => void,
-  selectedWallIndex?: number | null,
   onCardDragStart?: (id: string, e: React.DragEvent) => void,
   onCardDragEnd?: () => void,
 ) {
@@ -240,18 +260,10 @@ function renderAllyCards(
 
   if (wall.breached) return null;
 
-  return (
-    <div
-      className={`flex gap-1 justify-center items-center flex-wrap cursor-pointer rounded-lg p-0.5 transition-all ${
-        selectedWallIndex === wallIndex ? 'ring-1 ring-yamabuki-gold/40 bg-yamabuki-gold/5' : ''
-      }`}
-      onClick={() => {
-        if (!wall.breached) onAllyWallClick?.(wallIndex);
-      }}
-    >
-      {wall.cards.map((card, cardIdx) => (
-        <GameCard key={cardIdx} card={card} />
-      ))}
-    </div>
-  );
+  return wall.cards.map((card, cardIdx) => (
+    <GameCard
+      key={`${card.id}-${cardIdx}`}
+      card={card}
+    />
+  ));
 }
