@@ -52,9 +52,13 @@ export async function POST(req: NextRequest) {
         data: {
           code,
           player1Id: user.id,
-          player2Id: null, // 資料庫中 player2 設為 null，但在遊戲邏輯中使用 'guest'
+          player2Id: null,
           status: 'PLAYING',
           gameState: initialGameState as any,
+        },
+        include: {
+          player1: { select: { id: true, email: true } },
+          player2: { select: { id: true, email: true } },
         },
       });
     } else {
@@ -64,6 +68,10 @@ export async function POST(req: NextRequest) {
           code,
           player1Id: user.id,
           status: 'WAITING',
+        },
+        include: {
+          player1: { select: { id: true, email: true } },
+          player2: { select: { id: true, email: true } },
         },
       });
     }

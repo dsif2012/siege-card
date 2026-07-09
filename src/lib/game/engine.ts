@@ -2,6 +2,9 @@
 
 import { Card, CardSuit, GameState, PlayerState, AttackCard, Wall } from './types';
 
+/** 三層城牆防禦上限：首關 / 二關 / 本丸 */
+export const WALL_LIMITS = [20, 30, 40] as const;
+
 // 洗牌函數
 export function shuffle<T>(array: T[]): T[] {
   const arr = [...array];
@@ -149,11 +152,26 @@ export function setupPlayer(
   const { player, key } = getPlayers(state, playerId);
   const draft = key === 'player1' ? state.setupState.player1Draft : state.setupState.player2Draft;
 
-  // 驗證選擇的卡牌是否均在 draft 中
+  // 防止重複提交
+  if (key === 'player1' && state.setupState.player1Ready) {
+    throw new Error('您已完成開局配置，請等待對手');
+  }
+  if (key === 'player2' && state.setupState.player2Ready) {
+    throw new Error('您已完成開局配置，請等待對手');
+  }
+
+  // 驗證選擇的卡牌是否均在 draft 中，且數量正確、無重複
   const selectedIds = [...defenseCardIds, ...attackCardIds];
+  const uniqueIds = new Set(selectedIds);
+  if (defenseCardIds.length !== 3 || attackCardIds.length !== 2) {
+    throw new Error('請選擇正確數量的開局配置卡牌（防守 3、攻擊 2）');
+  }
+  if (uniqueIds.size !== 5) {
+    throw new Error('開局配置卡牌不可重複使用');
+  }
   const allInDraft = selectedIds.every(id => draft.some(c => c.id === id));
-  if (!allInDraft || defenseCardIds.length !== 3 || attackCardIds.length !== 2) {
-    throw new Error('請選擇正確數量的開局配置卡牌');
+  if (!allInDraft) {
+    throw new Error('所選卡牌不在您的開局手牌中（請確認是否輪到您配置）');
   }
 
   // 抽出卡牌
@@ -299,8 +317,7 @@ export function placeDefenseCards(
   // 檢查加上新卡牌後是否超過上限
   const currentSum = targetWall.cards.reduce((sum, c) => sum + c.value, 0);
   const newSum = cardsToPlace.reduce((sum, c) => sum + c.value, currentSum);
-  const limits = [20, 30, 40];
-  const limit = limits[wallIndex];
+  const limit = WALL_LIMITS[wallIndex];
 
   if (newSum > limit) {
     throw new Error(`放置防守牌後將超過該層城牆上限值 (${limit})，目前加總為 ${newSum}`);
@@ -568,7 +585,6 @@ export function respondToBreach(
   }
 
   // 逐一驗證並放置防守牌
-  const limits = [20, 30, 40];
   const activePlacements = placements.filter(p => p.cardId); // 過濾可能為空的項
 
   for (const placement of activePlacements) {
@@ -595,7 +611,7 @@ export function respondToBreach(
     // 驗證放置後是否超限
     const currentSum = wall.cards.reduce((sum, c) => sum + c.value, 0);
     const newSum = currentSum + card.value;
-    const limit = limits[wallIndex];
+    const limit = WALL_LIMITS[wallIndex];
 
     if (newSum > limit) {
       throw new Error(`放置防守牌後將超過第 ${wallIndex + 1} 層城牆上限 (${limit})，目前加總為 ${newSum}`);

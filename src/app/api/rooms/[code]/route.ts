@@ -1,24 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
-import { Card, GameState, Wall } from '@/lib/game/types';
-
-// 將卡牌資訊遮罩，防止作弊
-function maskCard(card: Card): Card {
-  return {
-    id: card.id,
-    suit: 'H', // 虛設花色
-    value: 0,  // 0 代表隱藏
-  };
-}
-
-// 遮罩防守牆上未被公開的防禦卡
-function maskWall(wall: Wall): Wall {
-  return {
-    ...wall,
-    cards: wall.cards.map((card, idx) => (wall.revealed[idx] ? card : maskCard(card))),
-  };
-}
+import { GameState } from '@/lib/game/types';
+import { filterGameStateForViewer } from '@/lib/game/mask';
 
 export async function GET(
   req: NextRequest,
@@ -44,40 +28,34 @@ export async function GET(
       return NextResponse.json({ error: '找不到指定的房間' }, { status: 404 });
     }
 
+    const isPlayer1 = room.player1Id === user.id;
+    const isPlayer2 = room.player2Id === user.id;
+    const isMember = isPlayer1 || isPlayer2;
+
+    // WAITING：尚無 gameState，僅房主可讀（對手應走 join）
     if (!room.gameState) {
+      if (!isPlayer1) {
+        return NextResponse.json({ error: '您不是此房間成員' }, { status: 403 });
+      }
       return NextResponse.json({ room, gameState: null });
     }
 
     const gameState = room.gameState as unknown as GameState;
-    const isPlayer1 = room.player1Id === user.id;
-    const isPlayer2 = room.player2Id === user.id;
     const isLocalGuest = gameState.player2.id === 'guest';
 
-    // 如果是本機單機 Hot-seat 模式，不對卡牌進行遮罩（因為同在一台裝置，由前端配合交接遮罩處理）
+    // 線上房間僅成員可讀；本機熱座僅房主
     if (isLocalGuest) {
+      if (!isPlayer1) {
+        return NextResponse.json({ error: '您不是此房間成員' }, { status: 403 });
+      }
       return NextResponse.json({ room, gameState });
     }
 
-    // 否則為聯機對戰模式，執行嚴格的防窺遮罩
-    const filteredState: GameState = JSON.parse(JSON.stringify(gameState));
-
-    if (isPlayer1) {
-      // 1. 隱藏 Player 2 的手牌
-      filteredState.player2.hand = filteredState.player2.hand.map(maskCard);
-      // 2. 隱藏 Player 2 城牆上未公開的牌
-      filteredState.player2.walls = filteredState.player2.walls.map(maskWall);
-    } else if (isPlayer2) {
-      // 1. 隱藏 Player 1 的手牌
-      filteredState.player1.hand = filteredState.player1.hand.map(maskCard);
-      // 2. 隱藏 Player 1 城牆上未公開的牌
-      filteredState.player1.walls = filteredState.player1.walls.map(maskWall);
-    } else {
-      // 旁觀者（或其他玩家）：兩邊的手牌與蓋牌皆隱藏
-      filteredState.player1.hand = filteredState.player1.hand.map(maskCard);
-      filteredState.player2.hand = filteredState.player2.hand.map(maskCard);
-      filteredState.player1.walls = filteredState.player1.walls.map(maskWall);
-      filteredState.player2.walls = filteredState.player2.walls.map(maskWall);
+    if (!isMember) {
+      return NextResponse.json({ error: '您不是此房間成員' }, { status: 403 });
     }
+
+    const filteredState = filterGameStateForViewer(gameState, user.id);
 
     return NextResponse.json({
       room,

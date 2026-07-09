@@ -1,13 +1,13 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700;900&family=Outfit:wght@300;400;600;800&display=swap');
 @import "tailwindcss";
 
-/* 匯入日系優雅的 Noto Serif TC (思源宋體) 字型 */
-
 :root {
-  --background: #111113; /* 深炭色 */
-  --foreground: #f5f4ef; /* 胡粉白 */
-  --shiko-red: #d33f49;  /* 朱砂紅 */
-  --yamabuki-gold: #d4af37; /* 山吹金 */
+  --background: #0c0c0e;
+  --foreground: #f5f4ef;
+  --shiko-red: #d33f49;
+  --yamabuki-gold: #d4af37;
+  --ink: #16161a;
+  --mist: rgba(245, 244, 239, 0.06);
 }
 
 @theme {
@@ -21,29 +21,36 @@ body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
-  background-image: 
-    radial-gradient(circle at 50% 0%, rgba(211, 63, 73, 0.08) 0%, transparent 60%),
-    radial-gradient(circle at 100% 100%, rgba(212, 175, 55, 0.04) 0%, transparent 50%);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(211, 63, 73, 0.12) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 40% at 100% 100%, rgba(212, 175, 55, 0.07) 0%, transparent 50%),
+    radial-gradient(ellipse 40% 30% at 0% 80%, rgba(211, 63, 73, 0.05) 0%, transparent 45%);
   background-attachment: fixed;
 }
 
-/* 日系和紙質感效果 */
+/* 和紙面板 */
 .washi-paper {
-  background-color: #1a1a1e;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 0);
-  background-size: 8px 8px;
+  background-color: #151518;
+  background-image:
+    radial-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 0),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 40%);
+  background-size: 7px 7px, 100% 100%;
   border: 1px solid rgba(245, 244, 239, 0.08);
 }
 
-/* 和紙卡牌質感 (亮) */
+/* 亮面卡牌 */
 .washi-card-light {
-  background-color: #f7f5f0;
-  background-image: radial-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 0);
-  background-size: 6px 6px;
+  background-color: #f8f6f1;
+  background-image:
+    radial-gradient(rgba(0, 0, 0, 0.035) 1px, transparent 0),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.55) 0%, transparent 45%);
+  background-size: 5px 5px, 100% 100%;
   color: #1c1c1f;
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 
-/* 蓄力金色火焰微光效果 */
 @keyframes gold-glow {
   0%, 100% {
     box-shadow: 0 0 4px rgba(212, 175, 55, 0.3), inset 0 0 2px rgba(212, 175, 55, 0.2);
@@ -57,18 +64,209 @@ body {
   animation: gold-glow 2s infinite ease-in-out;
 }
 
-/* 櫻花/和風紋路背景 */
 .japanese-pattern {
   background-color: #3b1115;
-  background-image: 
+  background-image:
     radial-gradient(circle at 100% 150%, #3b1115 24%, #4c171c 24%, #4c171c 28%, #3b1115 28%, #3b1115 36%, #4c171c 36%, #4c171c 40%, transparent 40%, transparent),
     radial-gradient(circle at 0% 150%, #3b1115 24%, #4c171c 24%, #4c171c 28%, #3b1115 28%, #3b1115 36%, #4c171c 36%, #4c171c 40%, transparent 40%, transparent);
   background-size: 20px 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
-/* 自訂捲軸樣式 (日式簡約) */
+/* —— 戰場美化 —— */
+.battlefield-frame {
+  position: relative;
+  border-radius: 1rem;
+  border: 1px solid rgba(212, 175, 55, 0.14);
+  background:
+    linear-gradient(180deg, rgba(22, 22, 26, 0.92) 0%, rgba(12, 12, 14, 0.88) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 12px 40px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.battlefield-frame::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle at 20% 15%, rgba(211, 63, 73, 0.06) 0%, transparent 35%),
+    radial-gradient(circle at 80% 85%, rgba(212, 175, 55, 0.05) 0%, transparent 40%);
+  z-index: 0;
+}
+
+.battlefield-frame > * {
+  position: relative;
+  z-index: 1;
+}
+
+.wall-stage {
+  position: relative;
+  border-radius: 0.875rem;
+  border: 1px solid rgba(245, 244, 239, 0.07);
+  background:
+    radial-gradient(ellipse 70% 80% at 50% 30%, rgba(40, 40, 48, 0.55) 0%, transparent 70%),
+    linear-gradient(180deg, rgba(18, 18, 22, 0.9) 0%, rgba(10, 10, 12, 0.95) 100%);
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.wall-stage--enemy {
+  box-shadow:
+    inset 0 0 40px rgba(0, 0, 0, 0.45),
+    inset 0 -20px 40px rgba(211, 63, 73, 0.04);
+}
+
+.wall-stage--ally {
+  box-shadow:
+    inset 0 0 40px rgba(0, 0, 0, 0.45),
+    inset 0 20px 40px rgba(212, 175, 55, 0.04);
+}
+
+.wall-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  font-size: 8px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  line-height: 1;
+  letter-spacing: 0.02em;
+  background: rgba(9, 9, 11, 0.88);
+  border: 1px solid rgba(245, 244, 239, 0.12);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.wall-badge--breached {
+  color: var(--shiko-red);
+  border-color: rgba(211, 63, 73, 0.4);
+  background: rgba(80, 10, 16, 0.55);
+}
+
+.wall-badge--active {
+  color: var(--yamabuki-gold);
+  border-color: rgba(212, 175, 55, 0.55);
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.25);
+}
+
+.wall-badge--target {
+  border-color: rgba(211, 63, 73, 0.5);
+  box-shadow: 0 0 12px rgba(211, 63, 73, 0.3);
+}
+
+.siege-axis {
+  position: relative;
+  border-radius: 1rem;
+  border: 1px solid rgba(212, 175, 55, 0.18);
+  background:
+    linear-gradient(90deg, rgba(211, 63, 73, 0.08) 0%, rgba(18, 18, 22, 0.95) 35%, rgba(18, 18, 22, 0.95) 65%, rgba(212, 175, 55, 0.08) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 8px 28px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+.pile-stack {
+  position: relative;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(245, 244, 239, 0.14);
+  background:
+    linear-gradient(160deg, #2a2a30 0%, #141416 100%);
+  box-shadow:
+    2px 2px 0 rgba(0, 0, 0, 0.35),
+    4px 4px 0 rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.hand-tray {
+  border-radius: 0.875rem;
+  border: 1px solid rgba(212, 175, 55, 0.16);
+  background:
+    linear-gradient(180deg, rgba(28, 26, 22, 0.9) 0%, rgba(14, 14, 16, 0.95) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(212, 175, 55, 0.08),
+    inset 0 -12px 24px rgba(0, 0, 0, 0.35);
+}
+
+.hand-tray--drop {
+  border-color: rgba(212, 175, 55, 0.55);
+  box-shadow:
+    0 0 0 1px rgba(212, 175, 55, 0.25),
+    inset 0 0 20px rgba(212, 175, 55, 0.08);
+}
+
+.player-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(9, 9, 11, 0.65);
+  border: 1px solid rgba(245, 244, 239, 0.08);
+  backdrop-filter: blur(4px);
+}
+
+.slot-empty {
+  border-radius: 0.4rem;
+  border: 1.5px dashed rgba(245, 244, 239, 0.18);
+  background: rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.slot-empty--gold {
+  border-color: rgba(212, 175, 55, 0.28);
+}
+
+.slot-empty--red {
+  border-color: rgba(211, 63, 73, 0.22);
+}
+
+.slot-empty--hot {
+  border-color: rgba(212, 175, 55, 0.7);
+  background: rgba(212, 175, 55, 0.1);
+  box-shadow: 0 0 16px rgba(212, 175, 55, 0.2);
+}
+
+.room-header {
+  border-bottom: 1px solid rgba(212, 175, 55, 0.12);
+  background:
+    linear-gradient(180deg, rgba(24, 24, 28, 0.98) 0%, rgba(16, 16, 18, 0.95) 100%);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.confirm-fab {
+  background: linear-gradient(135deg, #e0c04a 0%, #d4af37 45%, #b8922a 100%);
+  color: #1a1508;
+  box-shadow:
+    0 8px 24px rgba(212, 175, 55, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.confirm-fab:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px) scale(1.03);
+}
+
+@keyframes axis-pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.7; }
+}
+
+.axis-clash {
+  animation: axis-pulse 2.8s ease-in-out infinite;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.02);

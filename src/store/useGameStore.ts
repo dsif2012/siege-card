@@ -138,7 +138,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '無法創建房間');
-      set({ room: data.room, gameState: data.room.gameState, isLoading: false });
+      set({ room: data.room, gameState: data.room.gameState ?? null, isLoading: false });
       return data.room.code;
     } catch (err: any) {
       set({ error: err.message, isLoading: false });
@@ -156,7 +156,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '無法加入房間');
-      set({ room: data.room, gameState: data.room.gameState, isLoading: false });
+      set({ room: data.room, gameState: data.gameState ?? null, isLoading: false });
       return data.room.code;
     } catch (err: any) {
       set({ error: err.message, isLoading: false });
