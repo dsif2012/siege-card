@@ -46,7 +46,7 @@ export function GameCard({
         draggable={draggable}
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
-        className={`game-card w-11 h-[3.75rem] sm:w-12 sm:h-16 md:w-14 md:h-20 rounded border-2 flex items-center justify-center ${
+        className={`game-card w-11 h-[3.75rem] sm:w-12 sm:h-16 lg:w-[3.25rem] lg:h-[4.5rem] rounded border-2 flex items-center justify-center ${
           onClick || draggable ? 'cursor-pointer hover:scale-105' : ''
         } ${draggable ? 'cursor-grab active:cursor-grabbing' : ''} ${
           isSelected
@@ -71,7 +71,7 @@ export function GameCard({
       draggable={draggable}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
-      className={`game-card w-11 h-[3.75rem] sm:w-12 sm:h-16 md:w-14 md:h-20 washi-card-light rounded border flex flex-col justify-between p-1 sm:p-1.5 relative ${
+      className={`game-card w-11 h-[3.75rem] sm:w-12 sm:h-16 lg:w-[3.25rem] lg:h-[4.5rem] washi-card-light rounded border flex flex-col justify-between p-1 sm:p-1.5 relative ${
         onClick || draggable ? 'cursor-pointer hover:scale-105' : ''
       } ${draggable ? 'cursor-grab active:cursor-grabbing' : ''} ${
         isSelected
@@ -80,16 +80,16 @@ export function GameCard({
       } ${showCharge > 0 ? 'charge-glow' : ''}`}
     >
       <div className="flex flex-col leading-none items-start">
-        <span className={`text-[10px] sm:text-xs md:text-sm font-bold font-serif ${isRed ? 'text-shiko-red' : 'text-zinc-950'}`}>
+        <span className={`text-[10px] sm:text-xs font-bold font-serif ${isRed ? 'text-shiko-red' : 'text-zinc-950'}`}>
           {valueLabel}
         </span>
-        <span className={`text-[8px] sm:text-[10px] md:text-xs ${suit.color}`}>{suit.symbol}</span>
+        <span className={`text-[8px] sm:text-[10px] ${suit.color}`}>{suit.symbol}</span>
       </div>
-      <div className={`absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none text-lg sm:text-2xl ${suit.color}`}>
+      <div className={`absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none text-lg sm:text-xl ${suit.color}`}>
         {suit.symbol}
       </div>
       <div className="flex justify-end items-end leading-none">
-        <span className={`text-[8px] sm:text-[10px] md:text-xs font-bold font-serif ${isRed ? 'text-shiko-red' : 'text-zinc-950'}`}>
+        <span className={`text-[8px] sm:text-[10px] font-bold font-serif ${isRed ? 'text-shiko-red' : 'text-zinc-950'}`}>
           {valueLabel}
         </span>
       </div>

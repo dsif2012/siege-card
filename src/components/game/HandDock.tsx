@@ -35,7 +35,7 @@ export function HandDock({
   infoLabel, replaceCount,
 }: HandDockProps) {
   return (
-    <div className="flex flex-col shrink-0">
+    <div className="hand-dock-wrap flex flex-col">
       {/* Info bar above hand */}
       <div className="flex items-center justify-between px-2 py-1 bg-zinc-950/50 border-t border-foreground/5">
         <div className="player-chip">

@@ -28,10 +28,15 @@ export function LogDrawer({ logs, isOpen, onClose }: LogDrawerProps) {
 
   return (
     <>
-      {isOpen && (
-        <div className="fixed inset-0 z-35 bg-black/40" onClick={onClose} />
-      )}
-      <div className={`log-drawer ${isOpen ? 'log-drawer--open' : ''}`}>
+      <div
+        className={`log-drawer-backdrop ${isOpen ? 'log-drawer-backdrop--open' : ''}`}
+        onClick={onClose}
+        aria-hidden={!isOpen}
+      />
+      <div
+        className={`log-drawer ${isOpen ? 'log-drawer--open' : ''}`}
+        aria-hidden={!isOpen}
+      >
         <div className="log-drawer__handle relative" onClick={onClose}>
           <span className="text-[10px] font-black font-serif text-yamabuki-gold tracking-widest">
             軍務日誌

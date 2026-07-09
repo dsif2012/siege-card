@@ -49,7 +49,7 @@ export default function LobbyPage() {
   };
 
   return (
-    <main className="flex-1 flex flex-col items-center justify-center p-4 md:p-8 relative">
+    <main className="flex-1 min-h-0 overflow-y-auto flex flex-col items-center justify-center p-4 md:p-8 relative">
       {/* Title */}
       <div className="text-center mb-8 max-w-lg select-none">
         <div className="inline-flex items-center justify-center gap-2 text-shiko-red mb-2 animate-pulse">
