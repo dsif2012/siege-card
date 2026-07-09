@@ -29,8 +29,8 @@ export interface PlayerState {
 
 export type GamePhase = 
   | 'setup'                  // 開局階段：雙方配置防守牌與攻擊牌
-  | 'main_action'            // 主要行動階段：放攻擊、放防禦、蓄力三選一
-  | 'extra_action'           // 額外行動階段：抽2、偵查、破勢、進攻四選一，或跳過
+  | 'main_action'            // 主要行動：雙方交替（放攻擊、放防禦、蓄力）
+  | 'extra_action'           // 額外行動：雙方主回合後交替（抽2、偵查、破勢、進攻）
   | 'wall_breached_response' // 城牆攻破階段：防守方從手牌補牌防守
   | 'finished';              // 遊戲結束階段
 
@@ -54,7 +54,15 @@ export interface GameState {
     defenderId: string;        // 需回應城牆被攻破的防守方玩家 ID
     breachedWallIndex: number; // 被攻破的城牆索引 (0 或 1)
     cardsPlacedThisTurn: number; // 已經在此反應階段放置的卡牌數量 (最多 2)
+    attackerId: string;        // 發動進攻的玩家（補防後接續額外階段用）
+  };
+  /** 一輪內雙方主要行動是否已完成（P1主→P2主→額外階段） */
+  roundState?: {
+    player1MainDone: boolean;
+    player2MainDone: boolean;
   };
   winnerId?: string;        // 獲勝玩家 ID
   logs: string[];           // 行動紀錄日誌
+  /** 主要／額外行動階段截止時間（Unix ms）；setup／破城回應不計時 */
+  phaseDeadlineAt?: number;
 }

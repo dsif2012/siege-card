@@ -42,7 +42,10 @@ interface GameStore {
   createRoom: (localGuest: boolean) => Promise<string | null>;
   joinRoom: (code: string) => Promise<string | null>;
   fetchRoom: (code: string) => Promise<void>;
-  
+  /** SSE 即時訂閱房間狀態；回傳取消函式 */
+  subscribeRoomEvents: (code: string) => () => void;
+  applyRoomSnapshot: (room: Room, gameState: GameState | null) => void;
+
   submitAction: (code: string, action: string, payload: any) => Promise<void>;
   restartGame: (code: string) => Promise<void>;
 
@@ -186,13 +189,79 @@ export const useGameStore = create<GameStore>((set, get) => ({
       if (!res.ok) return;
       const data = await res.json();
       // 僅在有變動時更新，避免頻繁渲染
-      if (JSON.stringify(get().room) !== JSON.stringify(data.room) || 
+      if (JSON.stringify(get().room) !== JSON.stringify(data.room) ||
           JSON.stringify(get().gameState) !== JSON.stringify(data.gameState)) {
         set({ room: data.room, gameState: data.gameState });
       }
     } catch (e) {
       console.error(e);
     }
+  },
+
+  applyRoomSnapshot: (room, gameState) => {
+    const prev = get();
+    if (
+      JSON.stringify(prev.room) === JSON.stringify(room) &&
+      JSON.stringify(prev.gameState) === JSON.stringify(gameState)
+    ) {
+      return;
+    }
+    set({ room, gameState });
+  },
+
+  subscribeRoomEvents: (code) => {
+    const upper = code.toUpperCase();
+    let closed = false;
+    let es: EventSource | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let retryMs = 800;
+
+    const connect = () => {
+      if (closed) return;
+      es?.close();
+      es = new EventSource(`/api/rooms/${upper}/events`);
+
+      es.addEventListener('room', (ev) => {
+        try {
+          const data = JSON.parse((ev as MessageEvent).data);
+          get().applyRoomSnapshot(data.room, data.gameState ?? null);
+          retryMs = 800;
+        } catch (err) {
+          console.error('SSE room parse error', err);
+        }
+      });
+
+      es.addEventListener('room_error', (ev) => {
+        try {
+          const data = JSON.parse((ev as MessageEvent).data);
+          if (data?.error) set({ error: data.error });
+        } catch {
+          /* ignore */
+        }
+      });
+
+      es.onerror = () => {
+        es?.close();
+        es = null;
+        if (closed) return;
+        // 斷線後指數退避重連，並先用 REST 補一次
+        void get().fetchRoom(upper);
+        if (retryTimer) clearTimeout(retryTimer);
+        retryTimer = setTimeout(() => {
+          retryMs = Math.min(retryMs * 1.5, 5000);
+          connect();
+        }, retryMs);
+      };
+    };
+
+    connect();
+
+    return () => {
+      closed = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      es?.close();
+      es = null;
+    };
   },
 
   submitAction: async (code, action, payload) => {
@@ -206,12 +275,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '執行行動失敗');
-      
+
       set({
         room: data.room,
         gameState: data.gameState,
         isLoading: false,
       });
+
+      if (data.timedOut) {
+        get().clearUISelections();
+        return;
+      }
 
       // 如果有返回偵查到的卡牌，則更新 store 供 UI 顯示
       if (data.scoutedCards) {

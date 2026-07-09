@@ -8,5 +8,7 @@ export { HandDock } from './HandDock';
 export { ActionDock } from './ActionDock';
 export type { ActionDockProps, MainActionIntent } from './ActionDock';
 export { LogDrawer } from './LogDrawer';
+export { DiscardPileModal } from './DiscardPileModal';
 export { WaitingRoom } from './WaitingRoom';
 export { PhaseBanner } from './PhaseBanner';
+export { TurnTimer } from './TurnTimer';

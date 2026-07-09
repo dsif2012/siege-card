@@ -60,8 +60,8 @@ export default function LobbyPage() {
         <h1 className="text-4xl md:text-5xl font-black font-serif tracking-widest text-yamabuki-gold mb-3 drop-shadow-[0_2px_8px_rgba(212,175,55,0.2)]">
           瑪麗亞的城牆
         </h1>
-        <p className="text-xs md:text-sm text-foreground/60 tracking-wider">
-          —— 兵法蓄力，強攻破防，決勝於方寸城牆 ——
+        <p className="text-xs md:text-sm text-foreground/55 tracking-wider">
+          石牆為界，卡牌為兵
         </p>
       </div>
 

@@ -41,7 +41,7 @@ export function HandDock({
   infoLabel, replaceCount, trailingAction, guideHighlight,
 }: HandDockProps) {
   return (
-    <div className={`hand-dock-wrap ${guideHighlight ? 'guide-target' : ''}`}>
+    <div className={`hand-dock-wrap ${guideHighlight ? 'spotlight' : ''}`}>
       <div className="hand-dock-bar">
         <div className="player-chip shrink-0">
           <span className="w-1.5 h-1.5 rounded-full bg-yamabuki-gold" />
@@ -53,7 +53,9 @@ export function HandDock({
           </span>
         )}
         <div className="flex-1" />
-        {trailingAction}
+        {trailingAction && (
+          <div className="hand-dock-actions">{trailingAction}</div>
+        )}
       </div>
 
       <div

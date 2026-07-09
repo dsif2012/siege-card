@@ -3,13 +3,44 @@
 import React from 'react';
 import type { Card, AttackCard, GamePhase } from '@/lib/game/types';
 import { getAttackValue } from '@/lib/game/engine';
+import { hubPhaseLabel } from '@/lib/game/ui-step';
 import { GameCard } from './GameCard';
+import { TurnTimer } from './TurnTimer';
+
+const SWORD_ICON = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+    <path d="M14.5 3.5 L20.5 9.5 L18 12 L16.5 10.5 L13.5 13.5 L15 15 L12.5 17.5 L9.5 14.5 L4 20 L3 19 L8.5 13.5 L5.5 10.5 L8 8 L9.5 9.5 L12.5 6.5 L11 5 Z" />
+  </svg>
+);
+
+function SiegeLaneBadge({
+  side,
+  label,
+  value,
+}: {
+  side: 'enemy' | 'ally';
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <div className={`siege-axis__badge siege-axis__badge--${side}`}>
+      <div className={`siege-axis__badge-icon siege-axis__badge-icon--${side}`}>
+        {SWORD_ICON}
+      </div>
+      <div className="siege-axis__badge-meta">
+        <span className="siege-axis__badge-label">{label}</span>
+        <span className="siege-axis__badge-value">{value}</span>
+      </div>
+    </div>
+  );
+}
 
 export interface SiegeAxisProps {
   topAttackZone: AttackCard[];
   bottomAttackZone: AttackCard[];
   drawPileCount: number;
   discardPileCount: number;
+  onDiscardPileClick?: () => void;
   turnCount: number;
   phase: GamePhase;
   isP2View: boolean;
@@ -40,7 +71,9 @@ export interface SiegeAxisProps {
 
   mySetupReady: boolean;
   isLocalGuest: boolean;
-  activeActorName: string;
+
+  phaseDeadlineAt?: number;
+  onTimerExpire?: () => void;
 
   guideHighlight?: boolean;
 }
@@ -48,22 +81,35 @@ export interface SiegeAxisProps {
 export function SiegeAxis(props: SiegeAxisProps) {
   const {
     topAttackZone, bottomAttackZone,
-    drawPileCount, discardPileCount, turnCount, phase,
+    drawPileCount, discardPileCount, onDiscardPileClick, turnCount, phase,
     isP2View, canIControl,
     extraActionType, selectedDisruptAttackCards, onDisruptCardClick,
     replaceAttackIds, onReplaceToggle,
     setupCommitted, displayAttackSlots, setupSlotDropProps,
     onSetupCardDragStart, onSetupCardDragEnd,
-    mySetupReady, isLocalGuest, activeActorName,
+    mySetupReady, isLocalGuest,
+    phaseDeadlineAt, onTimerExpire,
     guideHighlight = false,
   } = props;
 
   const isSetup = phase === 'setup';
+  const showTimer =
+    (phase === 'main_action' || phase === 'extra_action') && !!phaseDeadlineAt;
+
+  const phaseLabel = hubPhaseLabel(phase);
+  const turnHint = (() => {
+    if (phase === 'finished') return null;
+    if (isSetup) {
+      if (mySetupReady && !isLocalGuest) return '已就緒，等待對手';
+      return canIControl ? '輪到你配置' : '對手配置中';
+    }
+    return canIControl ? '輪到你' : '對手回合';
+  })();
   const topPlayerKey = isP2View ? 'player1' : 'player2';
   const bottomPlayerKey = isP2View ? 'player2' : 'player1';
 
   return (
-    <div className={`siege-axis ${guideHighlight ? 'guide-target' : ''}`}>
+    <div className={`siege-axis ${guideHighlight ? 'spotlight' : ''}`}>
       {/* SVG decorative overlay */}
       <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden>
         <defs>
@@ -85,19 +131,14 @@ export function SiegeAxis(props: SiegeAxisProps) {
       </svg>
 
       <div className="siege-axis__inner">
-        {/* Left: top player (enemy) attack */}
-        <div className="flex items-center gap-1.5 min-w-0 justify-start">
-          <div className="hidden sm:flex flex-col items-center shrink-0 gap-0.5">
-            <div className="w-8 h-8 rounded-full bg-shiko-red/10 border border-shiko-red/30 flex items-center justify-center text-shiko-red">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M14.5 3.5 L20.5 9.5 L18 12 L16.5 10.5 L13.5 13.5 L15 15 L12.5 17.5 L9.5 14.5 L4 20 L3 19 L8.5 13.5 L5.5 10.5 L8 8 L9.5 9.5 L12.5 6.5 L11 5 Z" /></svg>
-            </div>
-            <span className="text-[8px] font-bold tracking-wider text-shiko-red/80">敵攻</span>
-            <span className="text-xs font-black font-serif text-shiko-red leading-none">{getAttackValue(topAttackZone)}</span>
-          </div>
-          <div className="sm:hidden text-[8px] text-shiko-red/70 font-bold shrink-0">
-            敵攻 {getAttackValue(topAttackZone)}
-          </div>
-          <div className="flex gap-1 overflow-x-auto min-w-0">
+        {/* Top: enemy attack */}
+        <div className="siege-axis__lane siege-axis__lane--enemy">
+          <SiegeLaneBadge
+            side="enemy"
+            label="敵方攻城"
+            value={getAttackValue(topAttackZone)}
+          />
+          <div className="siege-axis__lane-cards">
             {topAttackZone.map((ac, idx) => {
               const isSelected = selectedDisruptAttackCards.some(
                 x => x.playerKey === topPlayerKey && x.cardIndex === idx,
@@ -124,52 +165,59 @@ export function SiegeAxis(props: SiegeAxisProps) {
           </div>
         </div>
 
-        {/* Center: piles + turn */}
-        <div className="flex flex-col items-center gap-1 shrink-0 px-1">
-          <div className="flex items-center gap-1.5 sm:gap-2.5">
-            <div className="pile-stack w-8 h-11 sm:w-10 sm:h-14 md:w-12 md:h-16 flex flex-col items-center justify-center">
-              <span className="text-[7px] sm:text-[8px] text-foreground/40 relative z-[1]">牌堆</span>
-              <span className="text-xs sm:text-sm font-bold text-foreground/80 relative z-[1]">{drawPileCount}</span>
-            </div>
-            <div className="text-center leading-tight">
-              <span className="block text-[7px] sm:text-[8px] text-foreground/35 tracking-widest uppercase">Turn</span>
-              <span className="block text-lg sm:text-xl font-black font-serif text-yamabuki-gold">{turnCount}</span>
-            </div>
-            <div className="pile-stack w-8 h-11 sm:w-10 sm:h-14 md:w-12 md:h-16 flex flex-col items-center justify-center opacity-80">
-              <span className="text-[7px] sm:text-[8px] text-foreground/35">棄牌</span>
-              <span className="text-xs sm:text-sm font-bold text-foreground/55">{discardPileCount}</span>
-            </div>
+        {/* Center: draw → phase → discard */}
+        <div
+          className={`axis-hub shrink-0 ${canIControl && phase !== 'finished' ? 'axis-hub--active' : ''}`}
+        >
+          <div className="axis-hub__pile axis-hub__pile--draw" title="牌庫剩餘">
+            <svg className="axis-hub__pile-icon" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <rect x="5" y="6" width="12" height="15" rx="1.5" stroke="currentColor" strokeWidth="1.5" opacity="0.45" />
+              <rect x="8" y="3" width="12" height="15" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+            </svg>
+            <span className="axis-hub__pile-label">牌庫</span>
+            <span className="axis-hub__pile-count">{drawPileCount}</span>
           </div>
 
-          {/* Phase chip */}
-          {isSetup && (
-            mySetupReady && !isLocalGuest ? (
-              <div className="bg-sky-500/10 border border-sky-400/35 rounded-full px-2 py-0.5">
-                <p className="text-[8px] sm:text-[9px] text-sky-300 font-bold tracking-wider">已就緒</p>
+          <div className="axis-hub__command">
+            <div className="axis-hub__head">
+              {showTimer && phaseDeadlineAt && (
+                <TurnTimer
+                  deadlineAt={phaseDeadlineAt}
+                  onExpire={canIControl ? onTimerExpire : undefined}
+                  active={canIControl}
+                  compact
+                />
+              )}
+              <div className="axis-hub__phase">
+                <span className="axis-hub__round">第 {turnCount} 回合</span>
+                <span className="axis-hub__label">{phaseLabel}</span>
               </div>
-            ) : (
-              <div className="bg-yamabuki-gold/10 border border-yamabuki-gold/35 rounded-full px-2 py-0.5">
-                <p className="text-[8px] sm:text-[9px] text-yamabuki-gold font-bold tracking-wider">配置中</p>
-              </div>
-            )
-          )}
-          {phase === 'wall_breached_response' && (
-            <div className="bg-shiko-red/15 border border-shiko-red/40 rounded-full px-2 py-0.5 animate-pulse">
-              <p className="text-[8px] sm:text-[9px] text-shiko-red font-bold tracking-wider">緊急補防</p>
             </div>
-          )}
-          {(phase === 'main_action' || phase === 'extra_action') && (
-            <div className="bg-zinc-900/70 border border-foreground/8 rounded-full px-2 py-0.5 max-w-[8rem]">
-              <p className="text-[8px] sm:text-[9px] text-foreground/60 truncate">
-                <span className="text-foreground/30">操盤 </span>{activeActorName}
-              </p>
-            </div>
-          )}
+            {turnHint && (
+              <span className={`axis-hub__turn ${canIControl ? 'axis-hub__turn--mine' : ''}`}>
+                {turnHint}
+              </span>
+            )}
+          </div>
+
+          <button
+            type="button"
+            className="axis-hub__pile axis-hub__pile--discard"
+            title="查看棄牌堆"
+            onClick={onDiscardPileClick}
+          >
+            <svg className="axis-hub__pile-icon" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <rect x="6" y="7" width="12" height="14" rx="1.5" stroke="currentColor" strokeWidth="1.5" opacity="0.35" />
+              <path d="M9 11h6M9 14h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity="0.5" />
+            </svg>
+            <span className="axis-hub__pile-label">棄牌</span>
+            <span className="axis-hub__pile-count">{discardPileCount}</span>
+          </button>
         </div>
 
-        {/* Right: bottom player (ally) attack */}
-        <div className="flex items-center gap-1.5 min-w-0 justify-end">
-          <div className="flex gap-1 overflow-x-auto min-w-0 justify-end">
+        {/* Bottom: ally attack */}
+        <div className="siege-axis__lane siege-axis__lane--ally">
+          <div className="siege-axis__lane-cards">
             {isSetup ? (
               ([0, 1] as const).map(idx => {
                 const slot = (idx === 0 ? 'attack0' : 'attack1') as 'attack0' | 'attack1';
@@ -234,22 +282,15 @@ export function SiegeAxis(props: SiegeAxisProps) {
               </>
             )}
           </div>
-          <div className="hidden sm:flex flex-col items-center shrink-0 gap-0.5">
-            <div className="w-8 h-8 rounded-full bg-yamabuki-gold/10 border border-yamabuki-gold/35 flex items-center justify-center text-yamabuki-gold">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M14.5 3.5 L20.5 9.5 L18 12 L16.5 10.5 L13.5 13.5 L15 15 L12.5 17.5 L9.5 14.5 L4 20 L3 19 L8.5 13.5 L5.5 10.5 L8 8 L9.5 9.5 L12.5 6.5 L11 5 Z" /></svg>
-            </div>
-            <span className="text-[8px] font-bold tracking-wider text-yamabuki-gold/80">我攻</span>
-            <span className="text-xs font-black font-serif text-yamabuki-gold leading-none">
-              {isSetup
+          <SiegeLaneBadge
+            side="ally"
+            label="我方攻城"
+            value={
+              isSetup
                 ? `${[displayAttackSlots[0], displayAttackSlots[1]].filter(Boolean).length}/2`
-                : getAttackValue(bottomAttackZone)}
-            </span>
-          </div>
-          <div className="sm:hidden text-[8px] text-yamabuki-gold/70 font-bold shrink-0 text-right">
-            我攻 {isSetup
-              ? `${[displayAttackSlots[0], displayAttackSlots[1]].filter(Boolean).length}/2`
-              : getAttackValue(bottomAttackZone)}
-          </div>
+                : getAttackValue(bottomAttackZone)
+            }
+          />
         </div>
       </div>
     </div>

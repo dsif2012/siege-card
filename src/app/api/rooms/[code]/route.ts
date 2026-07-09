@@ -3,6 +3,7 @@ import db from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { GameState } from '@/lib/game/types';
 import { filterGameStateForViewer } from '@/lib/game/mask';
+import { syncRoomPhaseTimeout } from '@/lib/game/room-timeout';
 
 export async function GET(
   req: NextRequest,
@@ -32,15 +33,18 @@ export async function GET(
     const isPlayer2 = room.player2Id === user.id;
     const isMember = isPlayer1 || isPlayer2;
 
+    const synced = await syncRoomPhaseTimeout(room, Date.now());
+    const liveRoom = synced.room;
+
     // WAITING：尚無 gameState，僅房主可讀（對手應走 join）
-    if (!room.gameState) {
+    if (!liveRoom.gameState) {
       if (!isPlayer1) {
         return NextResponse.json({ error: '您不是此房間成員' }, { status: 403 });
       }
-      return NextResponse.json({ room, gameState: null });
+      return NextResponse.json({ room: liveRoom, gameState: null });
     }
 
-    const gameState = room.gameState as unknown as GameState;
+    const gameState = (synced.gameState ?? liveRoom.gameState) as unknown as GameState;
     const isLocalGuest = gameState.player2.id === 'guest';
 
     // 線上房間僅成員可讀；本機熱座僅房主
@@ -48,7 +52,7 @@ export async function GET(
       if (!isPlayer1) {
         return NextResponse.json({ error: '您不是此房間成員' }, { status: 403 });
       }
-      return NextResponse.json({ room, gameState });
+      return NextResponse.json({ room: liveRoom, gameState });
     }
 
     if (!isMember) {
@@ -58,7 +62,7 @@ export async function GET(
     const filteredState = filterGameStateForViewer(gameState, user.id);
 
     return NextResponse.json({
-      room,
+      room: liveRoom,
       gameState: filteredState,
     });
   } catch (error: any) {

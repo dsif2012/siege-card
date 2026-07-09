@@ -2,7 +2,7 @@
 
 import React from 'react';
 import type { Wall, Card, GamePhase } from '@/lib/game/types';
-import { getWallDefenseValue, getKnownWallDefenseValue } from '@/lib/game/engine';
+import { getWallDefenseValue, getKnownWallDefenseValue, WALL_CARD_LIMIT } from '@/lib/game/engine';
 import { GameCard, getCardValueLabel } from './GameCard';
 
 const WALL_NAMES = ['首關', '二關', '本丸'] as const;
@@ -63,7 +63,7 @@ export function WallArc(props: WallArcProps) {
   const isSetup = phase === 'setup';
 
   return (
-    <div className={`wall-stage ${side === 'enemy' ? 'wall-stage--enemy' : 'wall-stage--ally'} ${guideHighlight ? 'guide-target' : ''}`}>
+    <div className={`wall-stage ${side === 'enemy' ? 'wall-stage--enemy' : 'wall-stage--ally'} ${guideHighlight ? 'spotlight' : ''}`}>
       <div className="wall-row" role="group" aria-label={side === 'enemy' ? '敵方城牆' : '己方城牆'}>
         {TIER_ORDER.map((wallIndex) => {
           const wall = walls[wallIndex];
@@ -145,10 +145,16 @@ function EnemyBadge({ wall, wallIndex, wallLimit, isFrontline }: { wall: Wall; w
         : 'text-foreground/75'
     }`}>
       <span>{WALL_NAMES[wallIndex]}</span>
-      {wall.breached
-        ? <span className="font-bold">破</span>
-        : <span>{defenseLabel}</span>
-      }
+      {wall.breached ? (
+        <span className="font-bold">破</span>
+      ) : (
+        <>
+          <span>{defenseLabel}</span>
+          <span className="wall-badge__cards" title="防守牌張數">
+            {totalCards}/{WALL_CARD_LIMIT}
+          </span>
+        </>
+      )}
     </div>
   );
 }
@@ -161,6 +167,10 @@ function AllyBadge({
   selectedWallIndex: number | null; setupIsPlacing: boolean;
 }) {
   const active = selectedWallIndex === wallIndex || (isSetup && !setupCommitted && setupIsPlacing);
+  const cardCount = isSetup && !setupCommitted
+    ? (displayCard ? 1 : 0)
+    : wall.cards.length;
+
   return (
     <div className={`wall-badge ${
       wall.breached ? 'wall-badge--breached'
@@ -169,14 +179,21 @@ function AllyBadge({
     }`}>
       <span>{WALL_NAMES[wallIndex]}</span>
       {isSetup && !setupCommitted ? (
-        <span>{displayCard ? getCardValueLabel(displayCard.value) : '放置'}</span>
+        <>
+          <span>{displayCard ? getCardValueLabel(displayCard.value) : '放置'}</span>
+          <span className="wall-badge__cards" title="防守牌張數">
+            {cardCount}/{WALL_CARD_LIMIT}
+          </span>
+        </>
       ) : wall.breached ? (
         <span className="font-bold">破</span>
       ) : (
-        <span>
-          {getWallDefenseValue(wall)}/{wallLimit}
-          {wall.cards.length > 1 ? ` ·${wall.cards.length}` : ''}
-        </span>
+        <>
+          <span>{getWallDefenseValue(wall)}/{wallLimit}</span>
+          <span className="wall-badge__cards" title="防守牌張數">
+            {cardCount}/{WALL_CARD_LIMIT}
+          </span>
+        </>
       )}
     </div>
   );

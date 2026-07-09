@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { initGameState } from '@/lib/game/engine';
 import { filterGameStateForViewer } from '@/lib/game/mask';
 import { GameState } from '@/lib/game/types';
+import { publishRoom } from '@/lib/room-events';
 
 export async function POST(req: NextRequest) {
   try {
@@ -82,6 +83,8 @@ export async function POST(req: NextRequest) {
     }
 
     const filtered = filterGameStateForViewer(result.gameState!, user.id);
+
+    publishRoom(upperCode, result.room!.updatedAt.toISOString());
 
     return NextResponse.json({ room: result.room, gameState: filtered });
   } catch (error: any) {

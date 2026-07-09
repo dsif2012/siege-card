@@ -5,6 +5,141 @@ import { Card, CardSuit, GameState, PlayerState, AttackCard, Wall } from './type
 /** 三層城牆防禦上限：首關 / 二關 / 本丸 */
 export const WALL_LIMITS = [20, 30, 40] as const;
 
+/** 每層城牆最多可放置的防守牌張數 */
+export const WALL_CARD_LIMIT = 4;
+
+/** 主要行動階段時限（毫秒） */
+export const MAIN_ACTION_MS = 30_000;
+
+/** 額外行動階段時限（毫秒） */
+export const EXTRA_ACTION_MS = 30_000;
+
+/** 伺服器判定逾時的寬限（客戶端時鐘可能略快） */
+export const SERVER_TIMEOUT_GRACE_MS = 2_000;
+
+/** 蓄力對攻擊值的倍率（charge 每點 × 此倍率加入攻擊力） */
+export const CHARGE_BONUS_MULTIPLIER = 2;
+
+function ensureRoundState(state: GameState) {
+  if (!state.roundState) {
+    state.roundState = { player1MainDone: false, player2MainDone: false };
+  }
+  return state.roundState;
+}
+
+function markMainDone(state: GameState, playerId: string) {
+  const rs = ensureRoundState(state);
+  if (state.player1.id === playerId) rs.player1MainDone = true;
+  else rs.player2MainDone = true;
+}
+
+function bothMainDone(state: GameState): boolean {
+  const rs = ensureRoundState(state);
+  return rs.player1MainDone && rs.player2MainDone;
+}
+
+function resetRoundState(state: GameState) {
+  state.roundState = { player1MainDone: false, player2MainDone: false };
+}
+
+/** 主要行動完成後：對手主回合，或雙方主回合皆畢進入額外階段 */
+function advanceAfterMainAction(state: GameState, playerId: string): GameState {
+  markMainDone(state, playerId);
+  const { player, opponent } = getPlayers(state, playerId);
+
+  if (!bothMainDone(state)) {
+    state.activePlayerId = opponent.id;
+    state.phase = 'main_action';
+    setMainActionDeadline(state);
+    state.logs.push(`【系統】輪到玩家 ${opponent.email} 的主要行動。`);
+    return state;
+  }
+
+  state.activePlayerId = state.player1.id;
+  state.phase = 'extra_action';
+  state.hasDoneExtraAction = false;
+  setExtraActionDeadline(state);
+  state.logs.push(`【系統】雙方主要行動完成，進入額外階段（先手 ${state.player1.email}）。`);
+  return state;
+}
+
+/** 額外行動結束後：對手額外，或本輪結束 */
+function advanceAfterExtraAction(state: GameState, playerId: string): GameState {
+  if (playerId === state.player2.id) {
+    return endRound(state);
+  }
+  const { opponent } = getPlayers(state, playerId);
+  state.activePlayerId = opponent.id;
+  state.phase = 'extra_action';
+  state.hasDoneExtraAction = false;
+  setExtraActionDeadline(state);
+  state.logs.push(`【系統】輪到玩家 ${opponent.email} 的額外行動。`);
+  return state;
+}
+
+/** 一輪結束（P1主→P2主→P1額外→P2額外），開新回合 */
+function endRound(state: GameState): GameState {
+  state.turnCount += 1;
+  state.activePlayerId = state.player1.id;
+  state.phase = 'main_action';
+  state.hasDoneExtraAction = false;
+  resetRoundState(state);
+  setMainActionDeadline(state);
+  state.logs.push(`【系統】第 ${state.turnCount} 回合，輪到玩家 ${state.player1.email} 主要行動。`);
+  return state;
+}
+
+function setMainActionDeadline(state: GameState, now = Date.now()): void {
+  state.phaseDeadlineAt = now + MAIN_ACTION_MS;
+}
+
+function setExtraActionDeadline(state: GameState, now = Date.now()): void {
+  state.phaseDeadlineAt = now + EXTRA_ACTION_MS;
+}
+
+function clearPhaseDeadline(state: GameState): void {
+  state.phaseDeadlineAt = undefined;
+}
+
+/** 是否已達階段截止（含伺服器寬限） */
+export function isPhaseDeadlineDue(state: GameState, now = Date.now()): boolean {
+  return !!state.phaseDeadlineAt && now + SERVER_TIMEOUT_GRACE_MS >= state.phaseDeadlineAt;
+}
+
+/** 若計時階段已逾時，對當前行動玩家自動跳過（與誰發請求無關） */
+export function applyDuePhaseTimeout(state: GameState, now = Date.now()): GameState {
+  if (!isPhaseDeadlineDue(state, now)) {
+    return state;
+  }
+  const activeId = state.activePlayerId;
+  if (state.phase === 'main_action') {
+    return skipMainAction(state, activeId, true);
+  }
+  if (state.phase === 'extra_action') {
+    return skipExtraAction(state, activeId, true);
+  }
+  return state;
+}
+
+/** 舊存檔若缺 deadline，進入計時階段時補上 */
+export function ensurePhaseDeadline(state: GameState, now = Date.now()): GameState {
+  if (state.phase === 'main_action' && state.phaseDeadlineAt == null) {
+    setMainActionDeadline(state, now);
+  } else if (state.phase === 'extra_action' && state.phaseDeadlineAt == null) {
+    setExtraActionDeadline(state, now);
+  }
+  return state;
+}
+
+/** 若已逾時則自動跳過當前計時階段（伺服器權威） */
+export function maybeApplyTimeoutIfDue(
+  state: GameState,
+  _playerId: string,
+  now = Date.now(),
+): GameState {
+  return applyDuePhaseTimeout(state, now);
+}
+
 // 洗牌函數
 export function shuffle<T>(array: T[]): T[] {
   const arr = [...array];
@@ -149,9 +284,12 @@ export function getKnownWallDefenseValue(wall: Wall): {
   return { known, hiddenCount, totalCards: wall.cards.length };
 }
 
-// 計算當前攻擊值
+// 計算當前攻擊值（牌面 + 蓄力×倍率）
 export function getAttackValue(attackZone: AttackCard[]): number {
-  return attackZone.reduce((sum, ac) => sum + ac.card.value + ac.charge, 0);
+  return attackZone.reduce(
+    (sum, ac) => sum + ac.card.value + ac.charge * CHARGE_BONUS_MULTIPLIER,
+    0,
+  );
 }
 
 // 1. 開局玩家配置防守牌與攻擊牌
@@ -225,7 +363,9 @@ export function setupPlayer(
     state.activePlayerId = state.player1.id;
     state.turnCount = 1;
     state.hasDoneExtraAction = false;
-    state.logs.push('【系統】雙方配置完成！進入第一回合，輪到玩家 ' + state.player1.email + ' 的主要行動階段（第一回合不可進攻）。');
+    resetRoundState(state);
+    setMainActionDeadline(state);
+    state.logs.push('【系統】雙方配置完成！第 1 回合：玩家 ' + state.player1.email + ' 主要行動（本回合不可進攻）。');
   }
 
   return state;
@@ -292,9 +432,7 @@ export function placeAttackCards(
   const cardNames = cardsToPlace.map(formatCard).join('、');
   state.logs.push(`【行動】玩家 ${player.email} 從手牌放了 ${placeCount} 張攻擊牌到攻擊區：${cardNames}。`);
 
-  // 進入額外行動階段
-  state.phase = 'extra_action';
-  return state;
+  return advanceAfterMainAction(state, playerId);
 }
 
 // 3. 主要行動 2：放防守牌
@@ -323,6 +461,10 @@ export function placeDefenseCards(
     throw new Error('必須放置 1~2 張防守牌');
   }
 
+  if (targetWall.cards.length + cardIds.length > WALL_CARD_LIMIT) {
+    throw new Error(`該層城牆最多 ${WALL_CARD_LIMIT} 張防守牌（目前 ${targetWall.cards.length} 張）`);
+  }
+
   // 驗證卡牌在手牌中
   const cardsToPlace = cardIds.map(id => {
     const c = player.hand.find(h => h.id === id);
@@ -346,9 +488,7 @@ export function placeDefenseCards(
 
   state.logs.push(`【行動】玩家 ${player.email} 往 第 ${wallIndex + 1} 層城牆 (防守值變更為 ${newSum}/${limit}) 放入了 ${cardIds.length} 張防守牌（蓋牌）。`);
 
-  // 進入額外行動階段
-  state.phase = 'extra_action';
-  return state;
+  return advanceAfterMainAction(state, playerId);
 }
 
 // 4. 主要行動 3：續力
@@ -368,11 +508,9 @@ export function chargeAttackZone(state: GameState, playerId: string): GameState 
     ac.charge += 1;
   });
 
-  state.logs.push(`【行動】玩家 ${player.email} 執行蓄力，攻擊區所有卡牌的蓄力值 (Charge) +1。`);
+  state.logs.push(`【行動】玩家 ${player.email} 執行蓄力，攻擊區所有卡牌的蓄力值 (Charge) +1（攻擊時每點蓄力 +${CHARGE_BONUS_MULTIPLIER}）。`);
 
-  // 進入額外行動階段
-  state.phase = 'extra_action';
-  return state;
+  return advanceAfterMainAction(state, playerId);
 }
 
 // 5. 額外行動 1：抽兩張 (受手牌上限 8 限制)
@@ -536,7 +674,7 @@ export function attackWall(state: GameState, playerId: string): GameState {
   const defenseValue = getWallDefenseValue(targetWall);
 
   state.logs.push(`【額外行動】玩家 ${player.email} 進攻對手第 ${wallIndex + 1} 層城牆！`);
-  state.logs.push(`  - 攻擊值為 ${attackValue}（牌面和與 Charge 和）`);
+  state.logs.push(`  - 攻擊值為 ${attackValue}（牌面 + 蓄力×${CHARGE_BONUS_MULTIPLIER}）`);
   state.logs.push(`  - 防禦值為 ${defenseValue}（防禦牆上所有牌面和）`);
 
   const breached = attackValue > defenseValue;
@@ -558,6 +696,7 @@ export function attackWall(state: GameState, playerId: string): GameState {
     // 若第三層被攻破，防守方敗北
     if (wallIndex === 2) {
       state.phase = 'finished';
+      clearPhaseDeadline(state);
       state.winnerId = player.id;
       state.logs.push(`【結算】防線崩潰！玩家 ${player.email} 獲得了勝利！`);
     } else {
@@ -569,16 +708,17 @@ export function attackWall(state: GameState, playerId: string): GameState {
 
       // 移轉到防守補牌階段
       state.phase = 'wall_breached_response';
+      clearPhaseDeadline(state);
       state.breachedResponseState = {
         defenderId: opponent.id,
         breachedWallIndex: wallIndex,
         cardsPlacedThisTurn: 0,
+        attackerId: playerId,
       };
     }
   } else {
     state.logs.push('【戰報】進攻失敗！城牆堅固如初，進攻卡牌全數損毀。');
-    // 進攻失敗直接換下一位玩家
-    state = endTurn(state, playerId);
+    return advanceAfterExtraAction(state, playerId);
   }
 
   return state;
@@ -621,6 +761,10 @@ export function respondToBreach(
       throw new Error('不能放置防守牌於已攻破的城牆');
     }
 
+    if (wall.cards.length >= WALL_CARD_LIMIT) {
+      throw new Error(`該層城牆最多 ${WALL_CARD_LIMIT} 張防守牌`);
+    }
+
     // 檢查手牌
     const card = player.hand.find(c => c.id === cardId);
     if (!card) {
@@ -645,49 +789,88 @@ export function respondToBreach(
   }
 
   // 清除反應狀態
+  const attackerId = state.breachedResponseState.attackerId;
   state.breachedResponseState = undefined;
-  
-  // 反應結束後，原進攻方的回合強制結束，切換給防護方 (因為進攻是額外行動，已是回合尾聲)
-  // 此時原 activePlayerId 應該是進攻方，我們要換成防守方 (即當前的 playerId)
-  state.activePlayerId = playerId;
-  
-  // 若輪到 player1 開始新回合，回合數 +1
-  if (state.activePlayerId === state.player1.id) {
-    state.turnCount += 1;
+
+  if (!attackerId) {
+    resetRoundState(state);
+    state.activePlayerId = playerId;
+    state.phase = 'main_action';
+    state.hasDoneExtraAction = false;
+    setMainActionDeadline(state);
+    state.logs.push(`【系統】補防完成，輪到玩家 ${player.email} 主要行動。`);
+    return state;
   }
-  
-  state.hasDoneExtraAction = false;
-  state.phase = 'main_action';
-  
-  state.logs.push(`【系統】防守配置完成。進入第 ${state.turnCount} 回合，輪到玩家 ${player.email} 的主要行動階段。`);
+
+  // 補防後接續額外階段：若進攻方為 P1，輪到 P2 額外；若為 P2，本輪結束
+  if (attackerId === state.player1.id) {
+    state.activePlayerId = state.player2.id;
+    state.phase = 'extra_action';
+    state.hasDoneExtraAction = false;
+    setExtraActionDeadline(state);
+    state.logs.push(`【系統】補防完成，輪到玩家 ${state.player2.email} 的額外行動。`);
+  } else {
+    return endRound(state);
+  }
 
   return state;
 }
 
-// 10. 跳過額外行動 / 結束回合
-export function skipExtraAction(state: GameState, playerId: string): GameState {
+// 10. 跳過主要行動（逾時或手動）
+export function skipMainAction(
+  state: GameState,
+  playerId: string,
+  fromTimeout = false,
+): GameState {
+  if (state.phase !== 'main_action' || state.activePlayerId !== playerId) {
+    throw new Error('不是您的主要行動階段');
+  }
+  const { player } = getPlayers(state, playerId);
+  state.logs.push(
+    fromTimeout
+      ? `【逾時】玩家 ${player.email} 主要行動逾時，自動跳過。`
+      : `【行動】玩家 ${player.email} 跳過主要行動。`,
+  );
+  return advanceAfterMainAction(state, playerId);
+}
+
+// 11. 跳過額外行動 / 結束回合
+export function skipExtraAction(
+  state: GameState,
+  playerId: string,
+  fromTimeout = false,
+): GameState {
   if (state.phase !== 'extra_action' || state.activePlayerId !== playerId) {
     throw new Error('目前不能執行此操作');
   }
-  state.logs.push(`【行動】玩家 ${state.player1.id === playerId ? state.player1.email : state.player2.email} 選擇跳過額外行動。`);
-  return endTurn(state, playerId);
+  const actorEmail = state.player1.id === playerId ? state.player1.email : state.player2.email;
+  state.logs.push(
+    fromTimeout
+      ? `【逾時】玩家 ${actorEmail} 額外行動逾時，自動結束。`
+      : `【行動】玩家 ${actorEmail} 結束額外行動。`,
+  );
+  return advanceAfterExtraAction(state, playerId);
 }
 
-// 結束回合與切換玩家
+/** @deprecated 舊單人回合制；請用 advanceAfterExtraAction / endRound */
 export function endTurn(state: GameState, playerId: string): GameState {
-  const { opponent } = getPlayers(state, playerId);
+  return advanceAfterExtraAction(state, playerId);
+}
 
-  // 切換當前行動玩家
-  state.activePlayerId = opponent.id;
-  state.hasDoneExtraAction = false;
-  state.phase = 'main_action';
-
-  // 如果交棒回給 player1，則回合數增加
-  if (state.activePlayerId === state.player1.id) {
-    state.turnCount += 1;
+/** 客戶端／伺服器觸發的逾時跳過 */
+export function applyTimeoutSkip(
+  state: GameState,
+  playerId: string,
+  now = Date.now(),
+): GameState {
+  if (state.phase !== 'main_action' && state.phase !== 'extra_action') {
+    return state;
   }
-
-  state.logs.push(`【系統】回合交替。進入第 ${state.turnCount} 回合，輪到玩家 ${opponent.email} 的主要行動階段。`);
-  
-  return state;
+  if (!isPhaseDeadlineDue(state, now)) {
+    throw new Error('尚未逾時');
+  }
+  if (state.activePlayerId !== playerId) {
+    return state;
+  }
+  return applyDuePhaseTimeout(state, now);
 }

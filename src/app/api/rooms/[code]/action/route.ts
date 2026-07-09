@@ -4,6 +4,28 @@ import { getCurrentUser } from '@/lib/auth';
 import { GameState } from '@/lib/game/types';
 import * as engine from '@/lib/game/engine';
 import { filterGameStateForViewer } from '@/lib/game/mask';
+import { publishRoom } from '@/lib/room-events';
+import { syncRoomPhaseTimeout } from '@/lib/game/room-timeout';
+
+function resolveActionPlayerId(
+  gameState: GameState,
+  room: { player1Id: string | null; player2Id: string | null },
+  isLocalGuest: boolean,
+  isPlayer1: boolean,
+): string {
+  if (gameState.phase === 'wall_breached_response' && gameState.breachedResponseState) {
+    return gameState.breachedResponseState.defenderId;
+  }
+  if (gameState.phase === 'setup') {
+    if (isLocalGuest) {
+      return gameState.setupState?.player1Ready
+        ? gameState.player2.id
+        : gameState.player1.id;
+    }
+    return isPlayer1 ? room.player1Id! : room.player2Id!;
+  }
+  return gameState.activePlayerId;
+}
 
 export async function POST(
   req: NextRequest,
@@ -29,20 +51,24 @@ export async function POST(
       return NextResponse.json({ error: '找不到指定的房間' }, { status: 404 });
     }
 
-    if (room.status !== 'PLAYING') {
+    const body = await req.json();
+    const { action, payload } = body;
+
+    const now = Date.now();
+    const synced = await syncRoomPhaseTimeout(room, now);
+    const liveRoom = synced.room;
+    const gameState = synced.gameState;
+
+    if (liveRoom.status !== 'PLAYING') {
       return NextResponse.json({ error: '該房間目前不允許進行遊戲行動' }, { status: 400 });
     }
 
-    const gameState = room.gameState as unknown as GameState;
     if (!gameState) {
       return NextResponse.json({ error: '遊戲未初始化' }, { status: 400 });
     }
 
-    const body = await req.json();
-    const { action, payload } = body;
-
-    const isPlayer1 = room.player1Id === user.id;
-    const isPlayer2 = room.player2Id === user.id;
+    const isPlayer1 = liveRoom.player1Id === user.id;
+    const isPlayer2 = liveRoom.player2Id === user.id;
     const isLocalGuest = gameState.player2.id === 'guest';
     const isMember = isPlayer1 || isPlayer2;
 
@@ -53,24 +79,12 @@ export async function POST(
       return NextResponse.json({ error: '您不是此房間成員' }, { status: 403 });
     }
 
-    let actionPlayerId = '';
-    if (gameState.phase === 'wall_breached_response' && gameState.breachedResponseState) {
-      actionPlayerId = gameState.breachedResponseState.defenderId;
-    } else if (gameState.phase === 'setup') {
-      if (isLocalGuest) {
-        actionPlayerId = gameState.setupState?.player1Ready
-          ? gameState.player2.id
-          : gameState.player1.id;
-      } else {
-        actionPlayerId = isPlayer1 ? room.player1Id! : room.player2Id!;
-      }
-    } else {
-      actionPlayerId = gameState.activePlayerId;
-    }
+    let actionPlayerId = resolveActionPlayerId(gameState, liveRoom, isLocalGuest, isPlayer1);
 
     const isAuthorized = isLocalGuest
       ? isPlayer1
-      : (actionPlayerId === room.player1Id && isPlayer1) || (actionPlayerId === room.player2Id && isPlayer2);
+      : (actionPlayerId === liveRoom.player1Id && isPlayer1)
+        || (actionPlayerId === liveRoom.player2Id && isPlayer2);
 
     if (!isAuthorized && action !== 'restart') {
       return NextResponse.json({ error: '現在不是您的回合或您無權操作此玩家' }, { status: 403 });
@@ -80,6 +94,17 @@ export async function POST(
     }
     if (action === 'restart' && isLocalGuest && !isPlayer1) {
       return NextResponse.json({ error: '您不是此房間成員' }, { status: 403 });
+    }
+
+    if (synced.changed && action !== 'restart' && action !== 'timeout_skip') {
+      const returnedState = isLocalGuest
+        ? gameState
+        : filterGameStateForViewer(gameState, user.id);
+      return NextResponse.json({
+        room: liveRoom,
+        gameState: returnedState,
+        timedOut: true,
+      });
     }
 
     let nextState: GameState = JSON.parse(JSON.stringify(gameState));
@@ -134,10 +159,14 @@ export async function POST(
         nextState = engine.skipExtraAction(nextState, actionPlayerId);
         break;
       }
+      case 'timeout_skip': {
+        nextState = engine.applyTimeoutSkip(nextState, actionPlayerId, now);
+        break;
+      }
       case 'restart': {
-        const p2Id = isLocalGuest ? 'guest' : (room.player2Id || 'guest');
-        const p2Email = isLocalGuest ? 'Guest (本機客場玩家)' : (room.player2?.email || 'Guest');
-        nextState = engine.initGameState(room.player1Id, room.player1.email, p2Id, p2Email);
+        const p2Id = isLocalGuest ? 'guest' : (liveRoom.player2Id || 'guest');
+        const p2Email = isLocalGuest ? 'Guest (本機客場玩家)' : (liveRoom.player2?.email || 'Guest');
+        nextState = engine.initGameState(liveRoom.player1Id!, liveRoom.player1.email, p2Id, p2Email);
         nextState.logs.push(`【重啟】玩家 ${user.email} 重啟了遊戲。`);
         break;
       }
@@ -145,8 +174,8 @@ export async function POST(
         return NextResponse.json({ error: '無效的遊戲行動' }, { status: 400 });
     }
 
-    let roomStatus = room.status;
-    let roomWinnerId = room.winnerId;
+    let roomStatus = liveRoom.status;
+    let roomWinnerId = liveRoom.winnerId;
 
     if (nextState.phase === 'finished') {
       roomStatus = 'FINISHED';
@@ -172,6 +201,8 @@ export async function POST(
     const returnedState = isLocalGuest
       ? nextState
       : filterGameStateForViewer(nextState, user.id);
+
+    publishRoom(code, updatedRoom.updatedAt.toISOString());
 
     return NextResponse.json({
       room: updatedRoom,

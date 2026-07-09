@@ -16,11 +16,8 @@ export function WaitingRoom({ inviteCode }: WaitingRoomProps) {
           <div className="w-8 h-8 border-2 border-yamabuki-gold border-t-transparent rounded-full animate-spin" />
         </div>
         <div className="space-y-2">
-          <h2 className="text-lg font-black font-serif text-yamabuki-gold tracking-widest">等待對手加入</h2>
-          <p className="text-xs text-foreground/55 leading-relaxed">
-            將下方邀請碼分享給<strong className="text-foreground/75">另一個 email 帳號</strong>
-            （另一瀏覽器／無痕），對方於大廳登入後輸入即可開打。同一帳號無法加入自己的房。
-          </p>
+          <h2 className="text-lg font-black font-serif text-yamabuki-gold tracking-widest">瑪麗亞的城牆</h2>
+          <p className="text-[10px] text-foreground/45 tracking-widest">等待對手加入要塞</p>
         </div>
         <div className="bg-zinc-950/60 border border-yamabuki-gold/30 rounded-xl py-4 px-3">
           <p className="text-[10px] text-foreground/40 tracking-[0.25em] uppercase mb-1">邀請碼</p>

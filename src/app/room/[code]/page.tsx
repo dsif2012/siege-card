@@ -1,14 +1,15 @@
 'use client';
 
-import { useEffect, useState, useRef, use, type DragEvent, type MouseEvent } from 'react';
+import { useEffect, useState, useRef, useCallback, use, type DragEvent, type MouseEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGameStore } from '@/store/useGameStore';
 import { Card } from '@/lib/game/types';
 import { getAttackValue, getWallDefenseValue, WALL_LIMITS } from '@/lib/game/engine';
+import { computeSpotlight } from '@/lib/game/ui-step';
 import { ArrowLeft, RotateCcw, Eye, Sword } from 'lucide-react';
 import {
   GameCard, WallArc, SiegeAxis, HandDock, ActionDock,
-  LogDrawer, WaitingRoom, PhaseBanner,
+  LogDrawer, WaitingRoom, DiscardPileModal,
 } from '@/components/game';
 
 export default function GameRoomPage({ params: paramsPromise }: { params: Promise<{ code: string }> }) {
@@ -21,7 +22,7 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
     selectedHandCardIds, selectedWallIndex,
     selectedOpponentWallCardIndexes, selectedOpponentWallIndex,
     selectedDisruptAttackCards, isLoading, error,
-    fetchUser, fetchRoom, submitAction, restartGame,
+    fetchUser, fetchRoom, subscribeRoomEvents, submitAction, restartGame,
     toggleHandCardSelection, toggleOpponentCardSelection,
     toggleDisruptAttackCardSelection, selectWallIndex,
     clearUISelections, setScoutedCards,
@@ -30,6 +31,7 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
   const [isPassDeviceOverlayVisible, setIsPassDeviceOverlayVisible] = useState(false);
   const [activeActorId, setActiveActorId] = useState('');
   const [activeActorName, setActiveActorName] = useState('');
+  const [toast, setToast] = useState<string | null>(null);
 
   const [setupWall1, setSetupWall1] = useState<Card | null>(null);
   const [setupWall2, setSetupWall2] = useState<Card | null>(null);
@@ -42,8 +44,23 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
   const [extraActionType, setExtraActionType] = useState<'scout' | 'disrupt' | 'none'>('none');
   const [mainActionIntent, setMainActionIntent] = useState<'attack' | 'defense' | 'charge' | null>(null);
   const [isLogOpen, setIsLogOpen] = useState(false);
+  const [isDiscardModalOpen, setIsDiscardModalOpen] = useState(false);
 
   const lastActorIdRef = useRef<string | null>(null);
+  const timeoutFiredRef = useRef<string | null>(null);
+
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2800);
+  }, []);
+
+  const runAction = useCallback(async (fn: () => Promise<void>) => {
+    try {
+      await fn();
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : '行動失敗');
+    }
+  }, [showToast]);
 
   /* ═══ Effects ═══ */
 
@@ -54,24 +71,9 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
   }, [code, fetchUser, fetchRoom, clearUISelections]);
 
   useEffect(() => {
-    if (!room) return;
-    if (room.status === 'WAITING') {
-      const timer = setInterval(() => fetchRoom(code), 2000);
-      return () => clearInterval(timer);
-    }
-    if (room.status !== 'PLAYING') return;
-    const isLocalGuest = gameState?.player2.id === 'guest';
-    const isMyTurn =
-      gameState?.activePlayerId === user?.id ||
-      (gameState?.phase === 'wall_breached_response' &&
-        gameState?.breachedResponseState?.defenderId === user?.id) ||
-      (gameState?.phase === 'setup' &&
-        ((user?.id === gameState.player1.id && !gameState.setupState?.player1Ready) ||
-          (user?.id === gameState.player2.id && !gameState.setupState?.player2Ready)));
-    const intervalTime = isLocalGuest ? 10000 : isMyTurn ? 4000 : 2000;
-    const timer = setInterval(() => fetchRoom(code), intervalTime);
-    return () => clearInterval(timer);
-  }, [code, room, gameState, user, fetchRoom]);
+    const unsubscribe = subscribeRoomEvents(code);
+    return unsubscribe;
+  }, [code, subscribeRoomEvents]);
 
   useEffect(() => {
     if (!gameState) return;
@@ -118,7 +120,8 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
     setExtraActionType('none');
     setReplaceAttackIds([]);
     clearUISelections();
-  }, [gameState?.phase, gameState?.activePlayerId, clearUISelections]);
+    timeoutFiredRef.current = null;
+  }, [gameState?.phase, gameState?.activePlayerId, gameState?.phaseDeadlineAt, clearUISelections]);
 
   /* ═══ Early returns ═══ */
 
@@ -130,9 +133,7 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
     return (
       <div className="game-shell items-center justify-center">
         <div className="w-12 h-12 border-4 border-shiko-red border-t-transparent rounded-full animate-spin mb-4" />
-        <p className="text-yamabuki-gold font-serif tracking-widest text-sm">
-          {!room ? '正在載入房間...' : '正在載入古戰場狀態...'}
-        </p>
+        <p className="text-yamabuki-gold font-serif tracking-widest text-sm">載入中…</p>
       </div>
     );
   }
@@ -144,25 +145,22 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
   const isPlayer2 = room.player2Id === user?.id;
 
   let currentActorId = '';
-  let currentActorName = '';
   if (gameState.phase === 'setup') {
     if (isLocalGuest) {
-      if (!gameState.setupState?.player1Ready) { currentActorId = gameState.player1.id; currentActorName = gameState.player1.email; }
-      else { currentActorId = gameState.player2.id; currentActorName = gameState.player2.email; }
+      if (!gameState.setupState?.player1Ready) currentActorId = gameState.player1.id;
+      else currentActorId = gameState.player2.id;
     } else {
       const p1r = !!gameState.setupState?.player1Ready;
       const p2r = !!gameState.setupState?.player2Ready;
-      if (isPlayer1 && !p1r) { currentActorId = gameState.player1.id; currentActorName = gameState.player1.email; }
-      else if (isPlayer2 && !p2r) { currentActorId = gameState.player2.id; currentActorName = gameState.player2.email; }
-      else if (!p1r) { currentActorId = gameState.player1.id; currentActorName = `${gameState.player1.email}（配置中）`; }
-      else if (!p2r) { currentActorId = gameState.player2.id; currentActorName = `${gameState.player2.email}（配置中）`; }
+      if (isPlayer1 && !p1r) currentActorId = gameState.player1.id;
+      else if (isPlayer2 && !p2r) currentActorId = gameState.player2.id;
+      else if (!p1r) currentActorId = gameState.player1.id;
+      else if (!p2r) currentActorId = gameState.player2.id;
     }
   } else if (gameState.phase === 'wall_breached_response' && gameState.breachedResponseState) {
     currentActorId = gameState.breachedResponseState.defenderId;
-    currentActorName = currentActorId === gameState.player1.id ? gameState.player1.email : gameState.player2.email;
   } else {
     currentActorId = gameState.activePlayerId;
-    currentActorName = currentActorId === gameState.player1.id ? gameState.player1.email : gameState.player2.email;
   }
 
   const mySetupReady = isPlayer1
@@ -209,33 +207,40 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
 
   const wallLimits = [...WALL_LIMITS];
 
-  const guideTarget = (() => {
-    if (!canIControl) return null as null | 'actions' | 'hand' | 'ally-wall' | 'enemy-wall' | 'attack-zone';
-    if (gameState.phase === 'main_action') {
-      if (!mainActionIntent) return 'actions';
-      if (mainActionIntent === 'attack') return 'hand';
-      if (mainActionIntent === 'defense') {
-        if (selectedHandCardIds.length < 1) return 'hand';
-        if (selectedWallIndex === null) return 'ally-wall';
-        return null;
+  const spotlight = computeSpotlight({
+    phase: gameState.phase,
+    canIControl,
+    mainActionIntent,
+    extraActionType,
+    selectedHandCount: selectedHandCardIds.length,
+    selectedWallIndex,
+    selectedOpponentCardCount: selectedOpponentWallCardIndexes.length,
+    selectedDisruptAttackCount: selectedDisruptAttackCards.length,
+    hasDoneExtraAction: gameState.hasDoneExtraAction,
+  });
+
+  const attackReady = selectedHandCardIds.length >= 1 && selectedHandCardIds.length <= 2;
+  const defenseReady =
+    selectedHandCardIds.length >= 1 &&
+    selectedHandCardIds.length <= 2 &&
+    selectedWallIndex !== null;
+
+  const handleTimerExpire = () => {
+    if (!canIControl || !gameState.phaseDeadlineAt) return;
+    const key = `${gameState.phase}-${gameState.phaseDeadlineAt}`;
+    if (timeoutFiredRef.current === key) return;
+    timeoutFiredRef.current = key;
+    void (async () => {
+      try {
+        await submitAction(code, 'timeout_skip', {});
+        setMainActionIntent(null);
+        setExtraActionType('none');
+      } catch {
+        timeoutFiredRef.current = null;
+        await fetchRoom(code);
       }
-      return null;
-    }
-    if (gameState.phase === 'extra_action') {
-      if (extraActionType === 'none') return 'actions';
-      if (extraActionType === 'scout') return 'enemy-wall';
-      if (extraActionType === 'disrupt') {
-        if (selectedOpponentWallCardIndexes.length < 1) return 'enemy-wall';
-        if (selectedDisruptAttackCards.length < 1) return 'attack-zone';
-        return null;
-      }
-    }
-    if (gameState.phase === 'wall_breached_response') {
-      if (selectedHandCardIds.length < 1) return 'hand';
-      if (selectedWallIndex === null) return 'ally-wall';
-    }
-    return null;
-  })();
+    })();
+  };
 
   /* ═══ Setup helpers ═══ */
 
@@ -304,101 +309,85 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
 
   /* ═══ Handlers ═══ */
 
-  const handleSetupSubmit = async () => {
+  const handleSetupSubmit = () => runAction(async () => {
     if (!setupWall1 || !setupWall2 || !setupWall3 || !setupAttackSlots[0] || !setupAttackSlots[1]) {
-      alert('請填滿所有配置格子！防禦牌 3 張（各牆1張），攻擊牌 2 張。'); return;
+      throw new Error('牆×3 ＋ 攻×2');
     }
-    try {
-      await submitAction(code, 'setup', {
-        defenseCardIds: [setupWall1.id, setupWall2.id, setupWall3.id],
-        attackCardIds: [setupAttackSlots[0].id, setupAttackSlots[1].id],
-      });
-      setSetupWall1(null); setSetupWall2(null); setSetupWall3(null);
-      setSetupAttackSlots([null, null]); clearSetupSelection();
-    } catch (e: any) { alert(e.message || '配置失敗'); }
-  };
+    await submitAction(code, 'setup', {
+      defenseCardIds: [setupWall1.id, setupWall2.id, setupWall3.id],
+      attackCardIds: [setupAttackSlots[0].id, setupAttackSlots[1].id],
+    });
+    setSetupWall1(null); setSetupWall2(null); setSetupWall3(null);
+    setSetupAttackSlots([null, null]); clearSetupSelection();
+  });
 
-  const handlePlaceAttack = async () => {
-    if (selectedHandCardIds.length < 1 || selectedHandCardIds.length > 2) { alert('請選擇 1~2 張手牌放入攻擊區'); return; }
-    try {
-      await submitAction(code, 'place_attack', {
-        cardIds: selectedHandCardIds,
-        replaceIds: replaceAttackIds.length > 0 ? replaceAttackIds : undefined,
-      });
-      setReplaceAttackIds([]);
-      setMainActionIntent(null);
-    } catch (e: any) { alert(e.message || '行動失敗'); }
-  };
+  const handlePlaceAttack = () => runAction(async () => {
+    if (!attackReady) throw new Error('選 1～2 張');
+    await submitAction(code, 'place_attack', {
+      cardIds: selectedHandCardIds,
+      replaceIds: replaceAttackIds.length > 0 ? replaceAttackIds : undefined,
+    });
+    setReplaceAttackIds([]);
+    setMainActionIntent(null);
+  });
 
-  const handlePlaceDefense = async () => {
-    if (selectedHandCardIds.length < 1 || selectedHandCardIds.length > 2) { alert('請選擇 1~2 張手牌作為防守牌'); return; }
-    if (selectedWallIndex === null) { alert('請在下方己方城牆區域選擇要補防的城牆 (Wall 1 ~ 3)'); return; }
-    try {
-      await submitAction(code, 'place_defense', { wallIndex: selectedWallIndex, cardIds: selectedHandCardIds });
-      setMainActionIntent(null);
-    } catch (e: any) { alert(e.message || '行動失敗'); }
-  };
+  const handlePlaceDefense = () => runAction(async () => {
+    if (!defenseReady) throw new Error('選手牌＋城牆');
+    await submitAction(code, 'place_defense', { wallIndex: selectedWallIndex, cardIds: selectedHandCardIds });
+    setMainActionIntent(null);
+  });
 
-  const handleCharge = async () => {
-    try {
-      await submitAction(code, 'charge', {});
-      setMainActionIntent(null);
-    } catch (e: any) { alert(e.message || '行動失敗'); }
-  };
+  const handleCharge = () => runAction(async () => {
+    await submitAction(code, 'charge', {});
+    setMainActionIntent(null);
+  });
 
-  const handleDraw2 = async () => {
-    try { await submitAction(code, 'draw', {}); } catch (e: any) { alert(e.message || '行動失敗'); }
-  };
+  const handleDraw2 = () => runAction(async () => { await submitAction(code, 'draw', {}); });
 
-  const handleAttack = async () => {
-    try { await submitAction(code, 'attack', {}); } catch (e: any) { alert(e.message || '行動失敗'); }
-  };
+  const handleAttack = () => runAction(async () => { await submitAction(code, 'attack', {}); });
 
-  const handleScout = async () => {
+  const handleScout = () => runAction(async () => {
     if (selectedOpponentWallIndex === null || selectedOpponentWallCardIndexes.length === 0) {
-      alert('請點擊上方對手防護牆上的蓋牌 (最多2張) 以進行偵查'); return;
+      throw new Error('選對手蓋牌');
     }
-    try {
-      await submitAction(code, 'scout', {
-        targetWallIndex: selectedOpponentWallIndex, cardIndexes: selectedOpponentWallCardIndexes,
-      });
-      setExtraActionType('none');
-    } catch (e: any) { alert(e.message || '行動失敗'); }
-  };
+    await submitAction(code, 'scout', {
+      targetWallIndex: selectedOpponentWallIndex,
+      cardIndexes: selectedOpponentWallCardIndexes,
+    });
+    setExtraActionType('none');
+  });
 
-  const handleDisrupt = async () => {
+  const handleDisrupt = () => runAction(async () => {
     if (selectedOpponentWallIndex === null || selectedOpponentWallCardIndexes.length === 0) {
-      alert('請點擊上方對手防護牆上的蓋牌 (1~2張) 作為破勢公開對象'); return;
+      throw new Error('選對手蓋牌');
     }
-    if (selectedDisruptAttackCards.length === 0) {
-      alert('請選擇場上 1~2 張攻擊牌（雙方攻擊區均可選擇）使蓄力歸零'); return;
-    }
-    try {
-      await submitAction(code, 'disrupt', {
-        scoutPlacements: selectedOpponentWallCardIndexes.map(idx => ({
-          wallIndex: selectedOpponentWallIndex, cardIndex: idx,
-        })),
-        resetAttackPlacements: selectedDisruptAttackCards,
-      });
-      setExtraActionType('none');
-    } catch (e: any) { alert(e.message || '行動失敗'); }
-  };
+    if (selectedDisruptAttackCards.length === 0) throw new Error('選攻擊牌');
+    await submitAction(code, 'disrupt', {
+      scoutPlacements: selectedOpponentWallCardIndexes.map(idx => ({
+        wallIndex: selectedOpponentWallIndex,
+        cardIndex: idx,
+      })),
+      resetAttackPlacements: selectedDisruptAttackCards,
+    });
+    setExtraActionType('none');
+  });
 
-  const handleEndTurn = async () => {
-    try { await submitAction(code, 'skip_extra', {}); } catch (e: any) { alert(e.message || '行動失敗'); }
-  };
+  const handleEndTurn = () => runAction(async () => { await submitAction(code, 'skip_extra', {}); });
 
-  const handleBreachResponseSubmit = async () => {
+  const handleBreachResponseSubmit = () => runAction(async () => {
     if (selectedHandCardIds.length === 0) {
-      try { await submitAction(code, 'respond_breach', { placements: [] }); }
-      catch (e: any) { alert(e.message || '行動失敗'); }
+      await submitAction(code, 'respond_breach', { placements: [] });
       return;
     }
-    if (selectedWallIndex === null) { alert('請選擇要放置防守牌的剩餘城牆'); return; }
-    try {
-      const placements = selectedHandCardIds.map(id => ({ wallIndex: selectedWallIndex, cardId: id }));
-      await submitAction(code, 'respond_breach', { placements });
-    } catch (e: any) { alert(e.message || '行動失敗'); }
+    if (selectedWallIndex === null) throw new Error('選城牆');
+    const placements = selectedHandCardIds.map(id => ({ wallIndex: selectedWallIndex, cardId: id }));
+    await submitAction(code, 'respond_breach', { placements });
+  });
+
+  const cancelIntent = () => {
+    setMainActionIntent(null);
+    setExtraActionType('none');
+    clearUISelections();
   };
 
   /* ═══ Hand dock computed props ═══ */
@@ -408,80 +397,130 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
     : bottomPlayer.hand;
 
   const handInfoLabel = gameState.phase === 'setup'
-    ? (setupCommitted ? '剩餘手牌' : '待派卡牌')
-    : `${bottomPlayer.email} · 手牌`;
+    ? (setupCommitted ? '就緒' : '手牌')
+    : '手牌';
 
   const handEmptyMessage = gameState.phase === 'setup'
-    ? (setupCommitted ? '已就緒，等待對手完成配置' : '五張已就位，確認部署')
-    : '兩手空空，請儘快抽牌補給';
+    ? (setupCommitted ? '等待對手' : '拖放部署')
+    : '無牌';
 
   const isSetupDraft = gameState.phase === 'setup' && !setupCommitted;
+
+  const primaryCTA = (() => {
+    if (gameState.phase === 'setup') {
+      if (setupCommitted) return null;
+      if (setupIsReady && canIControl) {
+        return (
+          <button type="button" onClick={handleSetupSubmit} className="btn-primary primary-cta">
+            部署
+          </button>
+        );
+      }
+      return null;
+    }
+    if (!canIControl || gameState.phase === 'finished') return null;
+
+    if (gameState.phase === 'main_action' && mainActionIntent) {
+      const label =
+        mainActionIntent === 'attack' ? '出兵' :
+        mainActionIntent === 'defense' ? '補防' : '蓄力';
+      const onClick =
+        mainActionIntent === 'attack' ? handlePlaceAttack :
+        mainActionIntent === 'defense' ? handlePlaceDefense : handleCharge;
+      const disabled =
+        mainActionIntent === 'attack' ? !attackReady :
+        mainActionIntent === 'defense' ? !defenseReady : false;
+      return (
+        <>
+          <button type="button" onClick={cancelIntent} className="btn-ghost primary-cta--ghost">取消</button>
+          <button type="button" onClick={onClick} disabled={disabled} className="btn-primary primary-cta">
+            {label}
+          </button>
+        </>
+      );
+    }
+
+    if (gameState.phase === 'extra_action' && extraActionType !== 'none' && !gameState.hasDoneExtraAction) {
+      const ready =
+        selectedOpponentWallCardIndexes.length >= 1 &&
+        (extraActionType === 'scout' || selectedDisruptAttackCards.length >= 1);
+      return (
+        <>
+          <button type="button" onClick={cancelIntent} className="btn-ghost primary-cta--ghost">取消</button>
+          <button
+            type="button"
+            onClick={extraActionType === 'scout' ? handleScout : handleDisrupt}
+            disabled={!ready}
+            className="btn-primary primary-cta"
+          >
+            確認
+          </button>
+        </>
+      );
+    }
+
+    if (gameState.phase === 'wall_breached_response') {
+      const ready = selectedHandCardIds.length > 0 && selectedWallIndex !== null;
+      if (selectedHandCardIds.length === 0) {
+        return (
+          <button
+            type="button"
+            onClick={() => runAction(async () => { await submitAction(code, 'respond_breach', { placements: [] }); })}
+            className="btn-primary primary-cta"
+          >
+            略過
+          </button>
+        );
+      }
+      return (
+        <>
+          <button type="button" onClick={cancelIntent} className="btn-ghost primary-cta--ghost">取消</button>
+          <button
+            type="button"
+            onClick={handleBreachResponseSubmit}
+            disabled={!ready}
+            className="btn-primary primary-cta"
+          >
+            補防
+          </button>
+        </>
+      );
+    }
+
+    return null;
+  })();
+
+  const shellSpotlight = gameState.phase === 'setup' ? 'setup' : (spotlight ?? 'none');
 
   /* ═══ Render ═══ */
 
   return (
-    <div className="game-shell select-none font-sans">
-      {/* Header */}
-      <header className="room-header px-3 py-2 flex items-center justify-between">
-        <button onClick={() => router.push('/')} className="flex items-center gap-1 text-xs text-foreground/55 hover:text-foreground transition-colors">
-          <ArrowLeft className="w-3.5 h-3.5" /><span className="hidden sm:inline">大廳</span>
-        </button>
-        <div className="flex items-center gap-1.5">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-yamabuki-gold/80" aria-hidden>
-            <path d="M4 20V10l8-6 8 6v10H4z" stroke="currentColor" strokeWidth="1.5" fill="currentColor" fillOpacity="0.15" />
-            <path d="M10 20v-6h4v6" stroke="currentColor" strokeWidth="1.5" />
-          </svg>
-          <span className="text-sm font-bold font-serif text-yamabuki-gold tracking-widest">{room.code}</span>
-          <span className="text-[8px] bg-zinc-900/80 border border-foreground/10 text-foreground/60 px-1.5 py-0.5 rounded-full">
-            {isLocalGuest ? '本機' : '線上'}
-          </span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => setIsLogOpen(prev => !prev)}
-            className="text-[9px] text-foreground/45 hover:text-foreground/70 transition-colors border border-foreground/10 px-2 py-1 rounded-full"
-          >
-            日誌
+    <div className="game-shell select-none font-sans" data-spotlight={shellSpotlight}>
+      <header className="room-header">
+        <div className="room-header__slot room-header__slot--left">
+          <button type="button" onClick={() => router.push('/')} className="room-header__btn" aria-label="返回大廳">
+            <ArrowLeft className="w-3.5 h-3.5" />
           </button>
-          <button
-            onClick={() => restartGame(code)}
-            className="flex items-center gap-1 text-[9px] text-shiko-red/90 hover:text-shiko-red transition-colors border border-shiko-red/25 bg-shiko-red/5 px-2 py-1 rounded-full"
-          >
-            <RotateCcw className="w-3 h-3" /><span>重開</span>
+        </div>
+        <span className="room-header__title" title="瑪麗亞的城牆">瑪麗亞的城牆</span>
+        <div className="room-header__slot room-header__slot--right">
+          <span className="room-header__code">{room.code}</span>
+          <button type="button" onClick={() => setIsLogOpen(prev => !prev)} className="room-header__btn">日誌</button>
+          <button type="button" onClick={() => restartGame(code)} className="room-header__btn room-header__btn--danger" aria-label="重開">
+            <RotateCcw className="w-3 h-3" />
           </button>
         </div>
       </header>
 
-      {/* Phase Banner */}
-      <PhaseBanner
-        phase={gameState.phase}
-        activeActorName={currentActorName}
-        canIControl={canIControl}
-        turnCount={gameState.turnCount}
-        mySetupReady={mySetupReady}
-        isLocalGuest={isLocalGuest}
-        setupCommitted={setupCommitted}
-        mainActionIntent={mainActionIntent}
-        extraActionType={extraActionType}
-      />
-
-      {/* Scrollable Battlefield */}
-      <div className={`siege-board ${guideTarget ? `siege-board--guide-${guideTarget}` : ''}`}>
-        {/* Enemy info */}
-        <div className="flex items-center justify-between px-1">
+      <div className="siege-board">
+        <div className="flex items-center justify-between px-1 siege-board__enemy-bar">
           <div className="player-chip">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-shiko-red opacity-40" />
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-shiko-red" />
-            </span>
-            <span className="font-semibold text-foreground/80">{topPlayer.email}</span>
+            <span className="player-chip__dot player-chip__dot--enemy" />
+            <span>{topPlayer.email}</span>
           </div>
-          <span className="text-[9px] text-foreground/50 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-zinc-900/60 border border-foreground/8">
-            手牌 {topPlayer.hand.length}
-          </span>
+          <span className="player-chip player-chip--muted">{topPlayer.hand.length}</span>
         </div>
 
-        {/* Enemy Walls */}
         <WallArc
           walls={topPlayer.walls}
           wallLimits={wallLimits}
@@ -493,15 +532,15 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
           selectedOpponentWallIndex={selectedOpponentWallIndex}
           selectedOpponentWallCardIndexes={selectedOpponentWallCardIndexes}
           onEnemyCardClick={(wallIndex, cardIndex) => toggleOpponentCardSelection(wallIndex, cardIndex)}
-          guideHighlight={guideTarget === 'enemy-wall'}
+          guideHighlight={spotlight === 'enemy-wall'}
         />
 
-        {/* Siege Axis */}
         <SiegeAxis
           topAttackZone={topPlayer.attackZone}
           bottomAttackZone={bottomPlayer.attackZone}
           drawPileCount={gameState.drawPile.length}
           discardPileCount={gameState.discardPile.length}
+          onDiscardPileClick={() => setIsDiscardModalOpen(true)}
           turnCount={gameState.turnCount}
           phase={gameState.phase}
           isP2View={isP2View}
@@ -528,11 +567,11 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
           onSetupCardDragEnd={() => { setSetupDraggingCardId(null); setSetupDropTarget(null); }}
           mySetupReady={mySetupReady}
           isLocalGuest={isLocalGuest}
-          activeActorName={activeActorName}
-          guideHighlight={guideTarget === 'attack-zone'}
+          phaseDeadlineAt={gameState.phaseDeadlineAt}
+          onTimerExpire={handleTimerExpire}
+          guideHighlight={spotlight === 'attack-zone'}
         />
 
-        {/* Ally Walls */}
         <WallArc
           walls={bottomPlayer.walls}
           wallLimits={wallLimits}
@@ -548,8 +587,10 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
               return;
             }
             if (gameState.phase === 'main_action' && mainActionIntent !== 'defense') return;
-            if (canIControl && !bottomPlayer.walls[wallIndex].breached) {
-              selectWallIndex(selectedWallIndex === wallIndex ? null : wallIndex);
+            if (gameState.phase === 'wall_breached_response' || mainActionIntent === 'defense') {
+              if (canIControl && !bottomPlayer.walls[wallIndex].breached) {
+                selectWallIndex(selectedWallIndex === wallIndex ? null : wallIndex);
+              }
             }
           }}
           setupCommitted={setupCommitted}
@@ -563,11 +604,29 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
             clearUISelections();
           }}
           onCardDragEnd={() => { setSetupDraggingCardId(null); setSetupDropTarget(null); }}
-          guideHighlight={guideTarget === 'ally-wall'}
+          guideHighlight={spotlight === 'ally-wall'}
         />
       </div>
 
-      {/* Hand Dock（setup 時把確認／提示併入底欄，避免多佔一列被切掉） */}
+      <ActionDock
+        phase={gameState.phase}
+        canIControl={canIControl}
+        spotlight={spotlight}
+        mainActionIntent={mainActionIntent}
+        setMainActionIntent={setMainActionIntent}
+        hasDoneExtraAction={gameState.hasDoneExtraAction}
+        turnCount={gameState.turnCount}
+        extraActionType={extraActionType}
+        setExtraActionType={setExtraActionType}
+        onClearSelections={clearUISelections}
+        onDraw2={handleDraw2}
+        onAttack={handleAttack}
+        onEndTurn={handleEndTurn}
+        isBreachPhase={gameState.phase === 'wall_breached_response' && !!gameState.breachedResponseState}
+        winnerEmail={gameState.winnerId === bottomPlayer.id ? bottomPlayer.email : topPlayer.email}
+        onRestart={() => restartGame(code)}
+      />
+
       <HandDock
         cards={handCardsToShow}
         selectedCardIds={selectedHandCardIds}
@@ -580,6 +639,10 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
           }
           if (gameState.phase === 'main_action') {
             if (mainActionIntent !== 'attack' && mainActionIntent !== 'defense') return;
+          }
+          if (gameState.phase === 'wall_breached_response') {
+            toggleHandCardSelection(cardId);
+            return;
           }
           toggleHandCardSelection(cardId);
         }}
@@ -611,113 +674,53 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
           }
         }}
         replaceCount={replaceAttackIds.length > 0 ? replaceAttackIds.length : undefined}
-        guideHighlight={guideTarget === 'hand'}
-        trailingAction={
-          gameState.phase === 'setup' ? (
-            setupCommitted ? (
-              <span className="text-[9px] text-sky-300/70 tracking-wider shrink-0">已就緒 · 等待對手</span>
-            ) : setupIsReady && canIControl ? (
-              <button onClick={handleSetupSubmit} className="btn-primary text-[10px] px-3 py-1.5 shrink-0">
-                確認部署
-              </button>
-            ) : (
-              <span className="text-[9px] text-foreground/35 tracking-wider shrink-0 hidden sm:inline">
-                拖放或點選至城牆／攻擊區
-              </span>
-            )
-          ) : undefined
-        }
+        guideHighlight={spotlight === 'hand'}
+        trailingAction={primaryCTA}
       />
 
-      {/* Action Dock：setup 已併入手牌列，其餘階段才顯示 */}
-      {gameState.phase !== 'setup' && (
-        <ActionDock
-          phase={gameState.phase}
-          canIControl={canIControl}
-          setupIsReady={setupIsReady}
-          setupCommitted={setupCommitted}
-          onSetupSubmit={handleSetupSubmit}
-          mainActionIntent={mainActionIntent}
-          setMainActionIntent={setMainActionIntent}
-          selectedHandCount={selectedHandCardIds.length}
-          selectedWallIndex={selectedWallIndex}
-          replaceAttackCount={replaceAttackIds.length}
-          onPlaceAttack={handlePlaceAttack}
-          onPlaceDefense={handlePlaceDefense}
-          onCharge={handleCharge}
-          extraActionType={extraActionType}
-          setExtraActionType={setExtraActionType}
-          hasDoneExtraAction={gameState.hasDoneExtraAction}
-          turnCount={gameState.turnCount}
-          selectedOpponentCardCount={selectedOpponentWallCardIndexes.length}
-          selectedDisruptAttackCount={selectedDisruptAttackCards.length}
-          onDraw2={handleDraw2}
-          onAttack={handleAttack}
-          onScout={handleScout}
-          onDisrupt={handleDisrupt}
-          onEndTurn={handleEndTurn}
-          onClearSelections={clearUISelections}
-          isBreachPhase={gameState.phase === 'wall_breached_response' && !!gameState.breachedResponseState}
-          onBreachResponse={handleBreachResponseSubmit}
-          onBreachSkip={() => submitAction(code, 'respond_breach', { placements: [] })}
-          winnerEmail={gameState.winnerId === bottomPlayer.id ? bottomPlayer.email : topPlayer.email}
-          onRestart={() => restartGame(code)}
-        />
-      )}
-
-      {/* Log Drawer */}
       <LogDrawer logs={gameState.logs} isOpen={isLogOpen} onClose={() => setIsLogOpen(false)} />
 
-      {/* Scout Modal */}
+      <DiscardPileModal
+        cards={gameState.discardPile}
+        isOpen={isDiscardModalOpen}
+        onClose={() => setIsDiscardModalOpen(false)}
+      />
+
+      {toast && <div className="game-toast" role="status">{toast}</div>}
+      {error && !toast && <div className="game-toast game-toast--error" role="alert">{error}</div>}
+
       {scoutedCards && scoutedCards.length > 0 && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-4">
-          <div className="w-full max-w-sm washi-paper rounded-xl p-6 border-t-4 border-t-yamabuki-gold text-center space-y-6 shadow-2xl">
+          <div className="w-full max-w-sm washi-paper rounded-xl p-6 border-t-4 border-t-yamabuki-gold text-center space-y-4 shadow-2xl">
             <h3 className="text-sm font-black font-serif text-yamabuki-gold tracking-widest flex items-center justify-center gap-1.5">
-              <Eye className="w-4 h-4" />
-              <span>探子來報：城防偵查結果</span>
+              <Eye className="w-4 h-4" /><span>偵查</span>
             </h3>
-            <p className="text-xs text-foreground/70 leading-relaxed">
-              密探回報如下。這些防禦牌已永久公開，關閉後仍會維持翻開。
-            </p>
             <div className="flex gap-3 justify-center py-2">
               {scoutedCards.map((card, idx) => (
                 <GameCard key={idx} card={card} />
               ))}
             </div>
-            <button
-              onClick={() => setScoutedCards(null)}
-              className="btn-primary py-2 px-6 rounded tracking-wider"
-            >
-              已知悉
+            <button type="button" onClick={() => setScoutedCards(null)} className="btn-primary py-2 px-6">
+              關閉
             </button>
           </div>
         </div>
       )}
 
-      {/* Hot-seat Overlay */}
       {isPassDeviceOverlayVisible && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-50 flex flex-col items-center justify-center p-4">
           <div className="w-full max-w-md washi-paper rounded-xl p-8 border-2 border-shiko-red text-center space-y-6 shadow-2xl">
             <div className="w-16 h-16 rounded-full bg-red-950 border border-shiko-red/40 flex items-center justify-center mx-auto text-shiko-red animate-pulse">
               <Sword className="w-8 h-8" />
             </div>
-            <h3 className="text-lg font-black font-serif text-shiko-red tracking-widest">
-              【回合交替：裝置移交】
-            </h3>
-            <div className="space-y-3 py-2 bg-zinc-900/60 p-4 rounded border border-foreground/5 leading-relaxed text-xs">
-              <p className="text-foreground/80">
-                下一個行動將領為：
-                <span className="text-yamabuki-gold font-bold block text-sm font-serif mt-1">{activeActorName}</span>
-              </p>
-              <p className="text-foreground/50 text-[10px] leading-relaxed">
-                為防窺探對方手牌與軍情部署，請將手機/電腦移交給該將軍。準備妥當後，點擊下方按鈕以展開戰局。
-              </p>
-            </div>
+            <h3 className="text-lg font-black font-serif text-shiko-red tracking-widest">移交裝置</h3>
+            <p className="text-yamabuki-gold font-bold text-sm font-serif">{activeActorName}</p>
             <button
+              type="button"
               onClick={() => setIsPassDeviceOverlayVisible(false)}
               className="btn-danger w-full py-3 tracking-widest text-xs"
             >
-              末將就位，開啟回合！
+              就位
             </button>
           </div>
         </div>

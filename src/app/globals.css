@@ -5,22 +5,24 @@
    Design Tokens
    ══════════════════════════════════════ */
 :root {
-  --background: #0c0c0e;
-  --foreground: #f5f4ef;
-  --shiko-red: #d33f49;
-  --yamabuki-gold: #d4af37;
-  --ink: #16161a;
-  --mist: rgba(245, 244, 239, 0.06);
+  --background: #0a0c10;
+  --foreground: #ece8df;
+  --shiko-red: #c94a3d;
+  --yamabuki-gold: #c9a84c;
+  --ink: #12151c;
+  --stone: #2a3140;
+  --stone-light: #3d4658;
+  --mist: rgba(236, 232, 223, 0.06);
+  --fortress-sky: #1a2233;
 
-  /* 後備值；實際尺寸由 .siege-board 的 container query 覆寫 */
-  --card-w: 3rem;
-  --card-h: 4.15rem;
-  --board-gap: 0.5rem;
-  --board-pad: 0.5rem;
-  --wall-pad: 0.45rem;
-  --axis-pad-y: 0.5rem;
-  --hand-pad: 0.35rem;
-  --dock-max: calc(var(--card-h) + 2.25rem);
+  --card-w: 3.5rem;
+  --card-h: 4.75rem;
+  --board-gap: 0.45rem;
+  --board-pad: 0.45rem;
+  --wall-pad: 0.5rem;
+  --axis-pad-y: 0.45rem;
+  --hand-pad: 0.3rem;
+  --dock-max: calc(var(--card-h) + 2rem);
 }
 
 @theme {
@@ -38,9 +40,21 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   background-image:
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(211, 63, 73, 0.12) 0%, transparent 55%),
-    radial-gradient(ellipse 60% 40% at 100% 100%, rgba(212, 175, 55, 0.07) 0%, transparent 50%),
-    radial-gradient(ellipse 40% 30% at 0% 80%, rgba(211, 63, 73, 0.05) 0%, transparent 45%);
+    linear-gradient(180deg, rgba(26, 34, 51, 0.95) 0%, rgba(10, 12, 16, 0.98) 45%, #080a0e 100%),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 48px,
+      rgba(42, 49, 64, 0.15) 48px,
+      rgba(42, 49, 64, 0.15) 49px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 24px,
+      rgba(61, 70, 88, 0.08) 24px,
+      rgba(61, 70, 88, 0.08) 25px
+    );
   background-attachment: fixed;
   -webkit-tap-highlight-color: transparent;
 }
@@ -62,28 +76,380 @@ body {
   padding-top: env(safe-area-inset-top, 0px);
   isolation: isolate;
 
-  /* 手牌／底欄：跟戰場同級，避免大區小牌 */
-  --card-w: clamp(3.25rem, 9.5dvh, 5.25rem);
-  --card-h: clamp(4.5rem, 13dvh, 7.25rem);
-  --hand-pad: clamp(0.25rem, 0.7dvh, 0.45rem);
-  --dock-max: calc(var(--card-h) + 2.35rem);
+  --card-w: clamp(3.5rem, 10.5dvh, 6rem);
+  --card-h: clamp(4.85rem, 14.5dvh, 8.25rem);
+  --hand-pad: clamp(0.2rem, 0.55dvh, 0.4rem);
+  --dock-max: calc(var(--card-h) + 1.85rem);
+}
+
+/* Spotlight dimming — 非當步區域降透明度 */
+.game-shell[data-spotlight='hand'] .siege-board,
+.game-shell[data-spotlight='hand'] .action-strip {
+  opacity: 0.38;
+  pointer-events: none;
+  filter: saturate(0.7);
+}
+
+.game-shell[data-spotlight='ally-wall'] .siege-board__enemy-bar,
+.game-shell[data-spotlight='ally-wall'] .wall-stage--enemy,
+.game-shell[data-spotlight='ally-wall'] .siege-axis,
+.game-shell[data-spotlight='ally-wall'] .action-strip,
+.game-shell[data-spotlight='ally-wall'] .hand-dock-wrap {
+  opacity: 0.38;
+  pointer-events: none;
+  filter: saturate(0.7);
+}
+
+.game-shell[data-spotlight='enemy-wall'] .wall-stage--ally,
+.game-shell[data-spotlight='enemy-wall'] .siege-axis,
+.game-shell[data-spotlight='enemy-wall'] .action-strip,
+.game-shell[data-spotlight='enemy-wall'] .hand-dock-wrap,
+.game-shell[data-spotlight='enemy-wall'] .siege-board__enemy-bar {
+  opacity: 0.38;
+  pointer-events: none;
+  filter: saturate(0.7);
+}
+
+.game-shell[data-spotlight='attack-zone'] .wall-stage,
+.game-shell[data-spotlight='attack-zone'] .action-strip,
+.game-shell[data-spotlight='attack-zone'] .hand-dock-wrap,
+.game-shell[data-spotlight='attack-zone'] .siege-board__enemy-bar {
+  opacity: 0.38;
+  pointer-events: none;
+  filter: saturate(0.7);
+}
+
+.game-shell[data-spotlight='actions'] .siege-board,
+.game-shell[data-spotlight='actions'] .hand-dock-wrap {
+  opacity: 0.38;
+  pointer-events: none;
+  filter: saturate(0.7);
 }
 
 /* ══════════════════════════════════════
-   Phase Banner
+   Turn timer（戰軸中央也使用）
    ══════════════════════════════════════ */
-.phase-banner {
-  flex-shrink: 0;
+.turn-timer {
+  position: relative;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  padding: 0.3rem 0.75rem;
+}
+
+.turn-timer__track {
+  fill: none;
+  stroke: rgba(236, 232, 223, 0.12);
+  stroke-width: 3;
+}
+
+.turn-timer__progress {
+  fill: none;
+  stroke: var(--yamabuki-gold);
+  stroke-width: 3;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.2s linear;
+}
+
+.turn-timer__label {
+  position: absolute;
   font-size: 0.65rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--yamabuki-gold);
+}
+
+.turn-timer--urgent .turn-timer__progress { stroke: var(--shiko-red); }
+.turn-timer--urgent .turn-timer__label {
+  color: var(--shiko-red);
+  animation: timer-urgent 0.6s ease-in-out infinite;
+}
+
+.turn-timer--compact {
+  width: 28px;
+  height: 28px;
+}
+
+.turn-timer--compact .turn-timer__label {
+  font-size: 0.55rem;
+}
+
+/* 戰軸中央：階段指揮面板 + 牌庫／棄牌 */
+.axis-hub {
+  display: grid;
+  grid-template-areas:
+    "command command"
+    "draw discard";
+  grid-template-columns: 1fr 1fr;
+  align-items: stretch;
+  gap: 0.35rem;
+  min-width: clamp(7.5rem, 22vw, 10.5rem);
+  max-width: 11rem;
+  padding-inline: 0.15rem;
+}
+
+.axis-hub__pile--draw { grid-area: draw; }
+.axis-hub__command { grid-area: command; }
+.axis-hub__pile--discard { grid-area: discard; }
+
+.axis-hub--active .axis-hub__command {
+  border-color: rgba(212, 175, 55, 0.45);
+  box-shadow:
+    0 0 0 1px rgba(212, 175, 55, 0.08),
+    0 4px 16px rgba(212, 175, 55, 0.12);
+}
+
+.axis-hub__command {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.35rem 0.5rem 0.4rem;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(245, 244, 239, 0.1);
+  background: linear-gradient(180deg, rgba(28, 30, 36, 0.95) 0%, rgba(14, 15, 18, 0.98) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.axis-hub__pile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.28rem;
+  padding: 0.28rem 0.4rem;
+  border-radius: 0.45rem;
+  border: 1px solid rgba(245, 244, 239, 0.1);
+  background: rgba(0, 0, 0, 0.28);
+  color: rgba(245, 244, 239, 0.55);
+}
+
+.axis-hub__pile--discard {
+  color: rgba(245, 244, 239, 0.38);
+  cursor: pointer;
+  touch-action: manipulation;
+  font: inherit;
+  width: 100%;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.axis-hub__pile--discard:hover {
+  border-color: rgba(245, 244, 239, 0.22);
+  background: rgba(245, 244, 239, 0.06);
+  color: rgba(245, 244, 239, 0.62);
+}
+
+.axis-hub__pile-icon {
+  width: 0.9rem;
+  height: 0.9rem;
+  flex-shrink: 0;
+}
+
+.axis-hub__pile-label {
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+}
+
+.axis-hub__pile-count {
+  font-size: 0.75rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  min-width: 1.15em;
+  text-align: right;
+}
+
+.axis-hub__head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  width: 100%;
+}
+
+.axis-hub__phase {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.05rem;
+  min-width: 0;
+}
+
+.axis-hub__round {
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  color: rgba(245, 244, 239, 0.42);
+  font-family: var(--font-serif, serif);
+  white-space: nowrap;
+}
+
+.axis-hub__label {
+  font-size: clamp(0.8rem, 2.2vw, 0.95rem);
+  font-weight: 800;
+  font-family: var(--font-serif, serif);
+  letter-spacing: 0.08em;
+  color: rgba(245, 244, 239, 0.72);
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.axis-hub--active .axis-hub__label {
+  color: var(--yamabuki-gold);
+}
+
+.axis-hub__turn {
+  font-size: 0.58rem;
+  letter-spacing: 0.12em;
+  color: rgba(245, 244, 239, 0.38);
+  white-space: nowrap;
+}
+
+.axis-hub__turn--mine {
+  color: rgba(212, 175, 55, 0.85);
+  font-weight: 700;
+}
+
+.siege-axis__lane {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.siege-axis__lane--enemy {
+  justify-content: flex-start;
+}
+
+.siege-axis__lane--ally {
+  justify-content: flex-end;
+}
+
+.siege-axis__lane-cards {
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  min-width: 0;
+  min-height: var(--card-h);
+  max-height: var(--card-h);
+  align-items: center;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.siege-axis__lane-cards::-webkit-scrollbar {
+  display: none;
+}
+
+/* 戰軸攻擊區：hover 不放大，避免選取框／捲軸導致版面跳動 */
+.siege-axis__lane-cards .game-card {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.siege-axis__lane-cards .game-card:hover {
+  transform: none;
+}
+
+.siege-axis__lane-cards .game-card.cursor-pointer:hover {
+  filter: brightness(1.04);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+}
+
+.siege-axis__lane-cards .game-card.border-yamabuki-gold,
+.siege-axis__lane-cards .game-card.ring-2,
+.siege-axis__lane-cards .game-card.scale-105 {
+  transform: none;
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.55), 0 0 10px rgba(212, 175, 55, 0.25);
+}
+
+.siege-axis__lane--ally .siege-axis__lane-cards {
+  justify-content: flex-end;
+}
+
+.siege-axis__badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.siege-axis__badge-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.siege-axis__badge-icon--enemy {
+  background: rgba(211, 63, 73, 0.1);
+  border: 1px solid rgba(211, 63, 73, 0.3);
+  color: var(--shiko-red);
+}
+
+.siege-axis__badge-icon--ally {
+  background: rgba(212, 175, 55, 0.1);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  color: var(--yamabuki-gold);
+}
+
+.siege-axis__badge-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.siege-axis__badge-label {
+  font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.08em;
-  border-bottom: 1px solid rgba(212, 175, 55, 0.12);
-  background: linear-gradient(180deg, rgba(22, 22, 26, 0.95) 0%, rgba(12, 12, 14, 0.85) 100%);
+  white-space: nowrap;
+}
+
+.siege-axis__badge--enemy .siege-axis__badge-label { color: rgba(211, 63, 73, 0.85); }
+.siege-axis__badge--ally .siege-axis__badge-label { color: rgba(212, 175, 55, 0.85); }
+
+.siege-axis__badge-value {
+  font-size: 0.8rem;
+  font-weight: 800;
+  font-family: var(--font-serif, serif);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.siege-axis__badge--enemy .siege-axis__badge-value { color: var(--shiko-red); }
+.siege-axis__badge--ally .siege-axis__badge-value { color: var(--yamabuki-gold); }
+
+@media (min-width: 640px) {
+  .siege-axis__badge {
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+
+  .siege-axis__badge-meta {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.05rem;
+  }
+
+  .siege-axis__badge-label {
+    font-size: 0.5rem;
+    letter-spacing: 0.1em;
+  }
+
+  .siege-axis__badge-value {
+    font-size: 0.75rem;
+    line-height: 1;
+  }
+}
+
+@keyframes timer-urgent {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
 }
 
 /* ══════════════════════════════════════
@@ -108,8 +474,8 @@ body {
   padding-bottom: clamp(0.4rem, 1.2cqh, 0.85rem);
 
   /* 戰場區越大，牌越大；目標約佔區高 22% */
-  --card-w: clamp(3.25rem, 16cqh, 5.75rem);
-  --card-h: clamp(4.5rem, 22cqh, 8rem);
+  --card-w: clamp(3.5rem, 18cqh, 6.5rem);
+  --card-h: clamp(4.85rem, 24cqh, 9rem);
   --board-gap: clamp(0.45rem, 2.8cqh, 1.15rem);
   --board-pad: clamp(0.45rem, 2cqh, 1rem);
   --wall-pad: clamp(0.45rem, 2cqh, 0.95rem);
@@ -135,18 +501,25 @@ body {
    ══════════════════════════════════════ */
 .wall-stage {
   position: relative;
-  border-radius: 0.75rem;
-  border: 1px solid rgba(245, 244, 239, 0.07);
+  border-radius: 0.5rem;
+  border: 1px solid rgba(61, 70, 88, 0.55);
   background:
-    radial-gradient(ellipse 70% 80% at 50% 30%, rgba(40, 40, 48, 0.55) 0%, transparent 70%),
-    linear-gradient(180deg, rgba(18, 18, 22, 0.9) 0%, rgba(10, 10, 12, 0.95) 100%);
-  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.4);
+    repeating-linear-gradient(
+      0deg,
+      rgba(42, 49, 64, 0.9) 0px,
+      rgba(42, 49, 64, 0.9) 8px,
+      rgba(36, 42, 54, 0.95) 8px,
+      rgba(36, 42, 54, 0.95) 16px
+    ),
+    linear-gradient(180deg, rgba(42, 49, 64, 0.85) 0%, rgba(18, 21, 28, 0.95) 100%);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -8px 24px rgba(0, 0, 0, 0.45);
   overflow: visible;
-  padding: var(--wall-pad) clamp(0.6rem, 1.8vw, 1.1rem);
+  padding: var(--wall-pad) clamp(0.5rem, 1.6vw, 1rem);
   flex-shrink: 0;
   display: flex;
   justify-content: center;
-  /* 每關至少能並排 2 張補防牌，避免新蓋牌被擠出視野 */
   width: min(100%, calc(var(--card-w) * 10.5));
   margin-inline: auto;
 }
@@ -206,9 +579,9 @@ body {
 .hand-dock-wrap {
   flex-shrink: 0;
   z-index: 20;
-  background: rgba(12, 12, 14, 0.98);
-  box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.35);
-  border-top: 1px solid rgba(212, 175, 55, 0.14);
+  background: rgba(12, 14, 18, 0.98);
+  box-shadow: 0 -8px 20px rgba(0, 0, 0, 0.4);
+  border-top: 1px solid rgba(61, 70, 88, 0.45);
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
@@ -245,101 +618,206 @@ body {
 /* ══════════════════════════════════════
    Action Dock — contextual bottom bar
    ══════════════════════════════════════ */
-.action-dock {
+.action-strip {
   flex-shrink: 0;
-  z-index: 20;
-  padding: 0.3rem 0.5rem;
-  padding-bottom: max(0.3rem, env(safe-area-inset-bottom, 0px));
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-  align-items: center;
-  justify-content: center;
-  border-top: 1px solid rgba(245, 244, 239, 0.06);
-  background: rgba(12, 12, 14, 0.98);
-  max-height: 28vh;
-  overflow-y: auto;
-}
-
-.action-dock--await-choice {
-  box-shadow: 0 -10px 28px rgba(212, 175, 55, 0.12);
-}
-
-.guide-step {
-  display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
   gap: 0.35rem;
-  width: 100%;
-  padding: 0.2rem 0.5rem;
-  border-radius: 999px;
-  background: rgba(212, 175, 55, 0.08);
-  border: 1px solid rgba(212, 175, 55, 0.28);
-  color: rgba(245, 244, 239, 0.85);
+  padding: 0.35rem 0.5rem;
+  background: rgba(18, 21, 28, 0.92);
+  border-top: 1px solid rgba(61, 70, 88, 0.4);
+}
+
+.action-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  min-width: 3.25rem;
+  min-height: 3.25rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(61, 70, 88, 0.5);
+  background: rgba(42, 49, 64, 0.5);
+  color: rgba(236, 232, 223, 0.85);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.12s;
+  touch-action: manipulation;
+}
+
+.action-icon:hover:not(:disabled) {
+  border-color: rgba(201, 168, 76, 0.45);
+  background: rgba(201, 168, 76, 0.08);
+}
+
+.action-icon:active:not(:disabled) { transform: scale(0.96); }
+.action-icon:disabled { opacity: 0.3; pointer-events: none; }
+
+.action-icon--selected {
+  border-color: var(--yamabuki-gold);
+  background: rgba(201, 168, 76, 0.12);
+  box-shadow: 0 0 16px rgba(201, 168, 76, 0.15);
+}
+
+.action-icon--end {
+  min-width: 3.5rem;
+  border-color: rgba(201, 74, 61, 0.35);
+}
+
+.action-icon__glyph {
+  display: flex;
+  color: var(--yamabuki-gold);
+}
+
+.action-icon__label {
   font-size: 0.65rem;
-  letter-spacing: 0.04em;
-  animation: guide-pulse 1.8s ease-in-out infinite;
+  font-weight: 700;
+  font-family: var(--font-serif);
+  letter-spacing: 0.08em;
 }
 
-.guide-choice {
-  position: relative;
+.action-dock--finished {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  border-top: 1px solid rgba(201, 74, 61, 0.25);
+  background: rgba(18, 21, 28, 0.95);
 }
 
-.action-dock--await-choice .guide-choice:not(:disabled) {
-  border-color: rgba(212, 175, 55, 0.45);
-  box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.15), 0 0 16px rgba(212, 175, 55, 0.12);
-  animation: guide-choice-glow 1.8s ease-in-out infinite;
+.action-dock__winner {
+  font-family: var(--font-serif);
+  color: var(--yamabuki-gold);
+  font-weight: 800;
+  letter-spacing: 0.1em;
 }
 
-.guide-target {
-  position: relative;
-  outline: 1.5px dashed rgba(212, 175, 55, 0.55);
-  outline-offset: 3px;
-  border-radius: 0.75rem;
-  animation: guide-pulse 1.8s ease-in-out infinite;
+.action-dock__restart {
+  padding: 0.4rem 1.25rem;
+  font-size: 0.7rem;
 }
 
-.guide-target::after {
-  content: '點這裡';
-  position: absolute;
-  top: -0.7rem;
+.primary-cta {
+  padding: 0.45rem 1.1rem !important;
+  font-size: 0.75rem !important;
+  min-height: 2.25rem !important;
+}
+
+.primary-cta--ghost {
+  padding: 0.4rem 0.75rem !important;
+  font-size: 0.65rem !important;
+  min-height: 2.25rem !important;
+}
+
+.game-toast {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 5.5rem);
   left: 50%;
   transform: translateX(-50%);
-  z-index: 5;
-  padding: 0.1rem 0.45rem;
+  z-index: 60;
+  padding: 0.45rem 1rem;
   border-radius: 999px;
-  background: rgba(212, 175, 55, 0.95);
-  color: #1a1508;
-  font-size: 0.55rem;
+  background: rgba(18, 21, 28, 0.95);
+  border: 1px solid rgba(201, 168, 76, 0.35);
+  color: var(--foreground);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  animation: toast-in 0.2s ease-out;
+}
+
+.game-toast--error { border-color: rgba(201, 74, 61, 0.5); color: #f0a8a0; }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.room-header__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.45rem;
+  font-size: 0.6rem;
+  color: rgba(236, 232, 223, 0.5);
+  border: 1px solid rgba(61, 70, 88, 0.4);
+  border-radius: 0.35rem;
+  background: transparent;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.room-header__btn:hover { color: var(--foreground); border-color: rgba(201, 168, 76, 0.35); }
+.room-header__btn--danger { color: rgba(201, 74, 61, 0.85); border-color: rgba(201, 74, 61, 0.25); }
+
+.room-header__title {
+  font-family: var(--font-serif);
+  font-size: 0.7rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.18em;
+  color: var(--yamabuki-gold);
   white-space: nowrap;
-  pointer-events: none;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  justify-self: center;
+  text-align: center;
 }
 
-@keyframes guide-pulse {
-  0%, 100% { filter: brightness(1); }
-  50% { filter: brightness(1.08); }
+.room-header__code {
+  font-size: 0.55rem;
+  font-family: var(--font-serif);
+  color: rgba(236, 232, 223, 0.45);
+  letter-spacing: 0.1em;
+  padding: 0.15rem 0.4rem;
+  border: 1px solid rgba(61, 70, 88, 0.35);
+  border-radius: 0.25rem;
 }
 
-@keyframes guide-choice-glow {
-  0%, 100% { box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.15), 0 0 10px rgba(212, 175, 55, 0.08); }
-  50% { box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.35), 0 0 18px rgba(212, 175, 55, 0.22); }
+.player-chip__dot {
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 999px;
+  background: var(--yamabuki-gold);
 }
 
-@media (min-width: 640px) {
-  .action-dock {
-    padding: 0.35rem 0.75rem;
-    gap: 0.4rem;
-    max-height: 22vh;
-  }
+.player-chip__dot--enemy { background: var(--shiko-red); }
+
+.player-chip--muted {
+  font-size: 0.6rem;
+  padding: 0.15rem 0.45rem;
+  opacity: 0.7;
 }
 
-@media (min-width: 1024px) {
-  .action-dock {
-    max-height: 18vh;
-  }
+.spotlight,
+.guide-target {
+  position: relative;
+  box-shadow: inset 0 0 0 2px rgba(201, 168, 76, 0.55);
+  border-radius: 0.5rem;
+  animation: spotlight-pulse 1.6s ease-in-out infinite;
+  z-index: 2;
+}
+
+.siege-axis.spotlight {
+  outline: none;
+  animation: siege-axis-spotlight 1.6s ease-in-out infinite;
+}
+
+.guide-target::after { display: none; }
+
+@keyframes spotlight-pulse {
+  0%, 100% { box-shadow: inset 0 0 0 2px rgba(201, 168, 76, 0.4); }
+  50% { box-shadow: inset 0 0 0 2px rgba(201, 168, 76, 0.85), 0 0 16px rgba(201, 168, 76, 0.1); }
+}
+
+.siege-axis.spotlight {
+  animation: siege-axis-spotlight 1.6s ease-in-out infinite;
+}
+
+@keyframes siege-axis-spotlight {
+  0%, 100% { box-shadow: inset 0 0 0 2px rgba(201, 168, 76, 0.4); }
+  50% { box-shadow: inset 0 0 0 2px rgba(201, 168, 76, 0.85), 0 0 12px rgba(201, 168, 76, 0.08); }
 }
 
 /* ══════════════════════════════════════
@@ -412,6 +890,119 @@ body {
   flex: 1;
   overflow-y: auto;
   padding: 0.5rem 0.75rem;
+}
+
+/* ══════════════════════════════════════
+   Discard pile modal
+   ══════════════════════════════════════ */
+.discard-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(6px);
+}
+
+.discard-modal {
+  width: min(100%, 24rem);
+  max-height: min(78vh, 32rem);
+  display: flex;
+  flex-direction: column;
+  border-radius: 0.875rem;
+  border: 1px solid rgba(212, 175, 55, 0.28);
+  background: linear-gradient(180deg, rgba(24, 26, 32, 0.98) 0%, rgba(12, 13, 16, 0.99) 100%);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+
+.discard-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem 0.5rem;
+  border-bottom: 1px solid rgba(245, 244, 239, 0.06);
+}
+
+.discard-modal__title {
+  font-size: 0.8rem;
+  font-weight: 800;
+  font-family: var(--font-serif, serif);
+  letter-spacing: 0.14em;
+  color: var(--yamabuki-gold);
+}
+
+.discard-modal__count {
+  font-size: 0.65rem;
+  font-variant-numeric: tabular-nums;
+  color: rgba(245, 244, 239, 0.45);
+}
+
+.discard-modal__hint {
+  padding: 0.35rem 1rem 0;
+  font-size: 0.58rem;
+  color: rgba(245, 244, 239, 0.38);
+  letter-spacing: 0.04em;
+}
+
+.discard-modal__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.65rem 1rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.discard-modal__empty {
+  text-align: center;
+  padding: 2rem 0.5rem;
+  font-size: 0.75rem;
+  color: rgba(245, 244, 239, 0.4);
+}
+
+.discard-modal__grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.55rem;
+  --card-w: 3.1rem;
+  --card-h: 4.3rem;
+}
+
+.discard-modal__item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.discard-modal__badge {
+  position: absolute;
+  top: -0.35rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  font-size: 0.5rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 0.08rem 0.3rem;
+  border-radius: 999px;
+  color: var(--yamabuki-gold);
+  background: rgba(18, 18, 22, 0.95);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  white-space: nowrap;
+}
+
+.discard-modal__footer {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  padding: 0.55rem 1rem 0.85rem;
+  border-top: 1px solid rgba(245, 244, 239, 0.06);
 }
 
 /* ══════════════════════════════════════
@@ -565,6 +1156,17 @@ body {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
+.wall-badge__cards {
+  margin-left: 0.1rem;
+  padding: 0.12em 0.4em;
+  border-radius: 999px;
+  background: rgba(245, 244, 239, 0.08);
+  border: 1px solid rgba(245, 244, 239, 0.12);
+  color: rgba(245, 244, 239, 0.7);
+  font-size: 0.85em;
+  font-variant-numeric: tabular-nums;
+}
+
 .wall-badge--breached { color: var(--shiko-red); border-color: rgba(211, 63, 73, 0.4); background: rgba(80, 10, 16, 0.55); }
 .wall-badge--active { color: var(--yamabuki-gold); border-color: rgba(212, 175, 55, 0.55); box-shadow: 0 0 10px rgba(212, 175, 55, 0.25); }
 .wall-badge--target { border-color: rgba(211, 63, 73, 0.5); box-shadow: 0 0 12px rgba(211, 63, 73, 0.3); }
@@ -617,9 +1219,32 @@ body {
 
 .room-header {
   flex-shrink: 0;
-  border-bottom: 1px solid rgba(212, 175, 55, 0.12);
-  background: linear-gradient(180deg, rgba(24, 24, 28, 0.98) 0%, rgba(16, 16, 18, 0.95) 100%);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  box-sizing: border-box;
+  border-bottom: 1px solid rgba(61, 70, 88, 0.45);
+  background: linear-gradient(180deg, rgba(26, 34, 51, 0.98) 0%, rgba(12, 14, 18, 0.96) 100%);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.room-header__slot {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.room-header__slot--left {
+  justify-self: start;
+}
+
+.room-header__slot--right {
+  justify-self: end;
+  justify-content: flex-end;
+  gap: 0.35rem;
 }
 
 .confirm-fab {
@@ -700,6 +1325,359 @@ body {
 
 @media (min-width: 640px) {
   .wall-tier { padding: 0.25rem 0.2rem; gap: 0.2rem; }
+}
+
+/* ══════════════════════════════════════
+   Mobile RWD — 手機可玩（觸控、不裁切、可捲動）
+   ══════════════════════════════════════ */
+@media (max-width: 639px) {
+  .game-shell {
+    /* 扣除頂欄＋階段＋行動列＋手牌列，讓卡牌跟視窗高度協調 */
+    --game-chrome: 10.5rem;
+    --card-h: clamp(3.1rem, calc((100dvh - var(--game-chrome)) * 0.13), 5.25rem);
+    --card-w: calc(var(--card-h) * 0.72);
+    --dock-max: calc(var(--card-h) + 2.1rem);
+  }
+
+  .room-header {
+    padding-inline: 0.5rem;
+  }
+
+  .room-header__title {
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+  }
+
+  .siege-board {
+    justify-content: flex-start;
+    padding-inline: 0.35rem;
+    padding-top: 0.2rem;
+    --card-h: clamp(2.9rem, 15cqh, 5rem);
+    --card-w: calc(var(--card-h) * 0.72);
+    --board-gap: clamp(0.3rem, 1.8cqh, 0.65rem);
+    --wall-pad: 0.35rem;
+    --axis-pad-y: 0.35rem;
+  }
+
+  .siege-board__enemy-bar {
+    padding-inline: 0.15rem;
+  }
+
+  .player-chip {
+    font-size: 0.58rem;
+    max-width: 42vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .wall-stage {
+    width: 100%;
+    max-width: 100%;
+    padding-inline: 0.3rem;
+    border-radius: 0.45rem;
+  }
+
+  .wall-row {
+    gap: 0.2rem;
+  }
+
+  .wall-badge {
+    font-size: max(0.52rem, calc(var(--card-h) * 0.11));
+    padding: 0.15em 0.35em;
+    gap: 0.15rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 100%;
+  }
+
+  .wall-badge__cards {
+    font-size: 0.75em;
+    padding: 0.08em 0.28em;
+  }
+
+  .wall-tier {
+    padding: 0.15rem 0.05rem;
+    gap: 0.15rem;
+    min-width: 0;
+  }
+
+  .wall-tier__cards--stack > * {
+    margin-left: calc(var(--card-w) * -0.26);
+  }
+
+  .siege-axis__inner {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.22rem;
+    padding: 0.3rem 0.3rem;
+    min-height: auto;
+  }
+
+  .siege-axis .axis-clash {
+    display: none;
+  }
+
+  .siege-axis {
+    background:
+      linear-gradient(180deg, rgba(211, 63, 73, 0.08) 0%, rgba(18, 18, 22, 0.95) 35%, rgba(18, 18, 22, 0.95) 65%, rgba(212, 175, 55, 0.08) 100%);
+  }
+
+  /* 手機：攻防區橫排，標籤與卡牌同一行 */
+  .siege-axis__lane {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.2rem;
+    width: 100%;
+  }
+
+  .siege-axis__lane--enemy {
+    justify-content: flex-start;
+  }
+
+  .siege-axis__lane--ally {
+    justify-content: flex-end;
+  }
+
+  .siege-axis__lane--ally .siege-axis__badge {
+    order: 0;
+    width: auto;
+  }
+
+  .siege-axis__lane--enemy .siege-axis__badge {
+    width: auto;
+  }
+
+  .siege-axis__lane--enemy { order: 1; }
+  .axis-hub { order: 2; }
+  .siege-axis__lane--ally { order: 3; }
+
+  .siege-axis__lane-cards {
+    justify-content: center;
+    width: auto;
+    flex: 1;
+    min-width: 0;
+    padding-inline: 0;
+  }
+
+  .siege-axis__lane--ally .siege-axis__lane-cards {
+    justify-content: flex-end;
+  }
+
+  .siege-axis__badge {
+    flex-direction: row;
+    gap: 0.15rem;
+    padding: 0.1rem 0.2rem;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.22);
+  }
+
+  .siege-axis__badge-icon {
+    width: 1.35rem;
+    height: 1.35rem;
+  }
+
+  .siege-axis__badge-icon svg {
+    width: 10px;
+    height: 10px;
+  }
+
+  .siege-axis__badge-meta {
+    flex-direction: row;
+    gap: 0.2rem;
+    align-items: baseline;
+  }
+
+  .siege-axis__badge-label {
+    font-size: 0.5rem;
+    letter-spacing: 0.04em;
+  }
+
+  .siege-axis__badge-value {
+    font-size: 0.65rem;
+  }
+
+  /* 手機：中軸壓成一行 — 牌庫｜階段｜棄牌 */
+  .axis-hub {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    grid-template-areas: "draw command discard";
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr) minmax(0, auto);
+    gap: 0.18rem;
+    padding-inline: 0.1rem;
+  }
+
+  .axis-hub__pile {
+    flex-direction: column;
+    gap: 0.02rem;
+    padding: 0.18rem 0.28rem;
+    min-width: 2.1rem;
+    border-radius: 0.35rem;
+  }
+
+  .axis-hub__pile-icon {
+    width: 0.65rem;
+    height: 0.65rem;
+  }
+
+  .axis-hub__pile-label {
+    font-size: 0.48rem;
+    line-height: 1;
+  }
+
+  .axis-hub__pile-count {
+    font-size: 0.68rem;
+    min-width: 0;
+    text-align: center;
+  }
+
+  .axis-hub__command {
+    padding: 0.22rem 0.3rem;
+    gap: 0.08rem;
+    border-radius: 0.4rem;
+  }
+
+  .axis-hub__head {
+    gap: 0.2rem;
+  }
+
+  .axis-hub__phase {
+    gap: 0;
+  }
+
+  .axis-hub__label {
+    font-size: 0.68rem;
+    letter-spacing: 0.06em;
+    line-height: 1.1;
+  }
+
+  .axis-hub__round {
+    font-size: 0.48rem;
+    line-height: 1.1;
+  }
+
+  .axis-hub__turn {
+    font-size: 0.48rem;
+    letter-spacing: 0.05em;
+    line-height: 1.1;
+  }
+
+  .turn-timer--compact {
+    width: 26px;
+    height: 26px;
+  }
+
+  .turn-timer--compact .turn-timer__label {
+    font-size: 0.5rem;
+  }
+
+  .action-strip {
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    padding: 0.3rem 0.4rem;
+    gap: 0.28rem;
+  }
+
+  .action-strip::-webkit-scrollbar {
+    display: none;
+  }
+
+  .action-icon {
+    flex-shrink: 0;
+    scroll-snap-align: center;
+    min-width: 2.9rem;
+    min-height: 2.9rem;
+    padding: 0.3rem 0.4rem;
+  }
+
+  .action-icon__glyph svg {
+    width: 1.15rem;
+    height: 1.15rem;
+  }
+
+  .hand-dock-bar {
+    flex-wrap: wrap;
+    align-items: center;
+    padding-inline: 0.35rem;
+    gap: 0.3rem;
+  }
+
+  .hand-dock-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+
+  .hand-dock {
+    justify-content: flex-start;
+    padding-inline: 0.35rem;
+    scroll-padding-inline: 0.5rem;
+  }
+
+  .primary-cta,
+  .primary-cta--ghost {
+    min-height: 2.75rem !important;
+    min-width: 2.75rem;
+    touch-action: manipulation;
+  }
+
+  .btn-primary,
+  .btn-ghost,
+  .btn-danger {
+    min-height: 2.75rem;
+    touch-action: manipulation;
+  }
+
+  .game-card,
+  .slot-card {
+    touch-action: manipulation;
+  }
+
+  .game-toast {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 6.5rem);
+    max-width: min(92vw, 20rem);
+    text-align: center;
+  }
+}
+
+/* 矮螢幕（橫拿或小機）再壓縮一檔 */
+@media (max-width: 639px) and (max-height: 740px) {
+  .game-shell {
+    --game-chrome: 9.75rem;
+    --card-h: clamp(2.75rem, calc((100dvh - var(--game-chrome)) * 0.115), 4.35rem);
+    --card-w: calc(var(--card-h) * 0.72);
+  }
+
+  .siege-board {
+    --card-h: clamp(2.65rem, 13cqh, 4.25rem);
+    --card-w: calc(var(--card-h) * 0.72);
+    --board-gap: 0.25rem;
+  }
+
+  .action-icon {
+    min-width: 2.65rem;
+    min-height: 2.65rem;
+  }
+}
+
+/* 極窄機（iPhone SE 等）城牆標籤再縮 */
+@media (max-width: 380px) {
+  .wall-badge > span:first-child {
+    font-size: 0.9em;
+  }
+
+  .room-header__code {
+    display: none;
+  }
 }
 
 /* ══════════════════════════════════════

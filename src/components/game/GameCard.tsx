@@ -2,6 +2,7 @@
 
 import React from 'react';
 import type { Card } from '@/lib/game/types';
+import { CHARGE_BONUS_MULTIPLIER } from '@/lib/game/engine';
 
 const SUIT_MAP: Record<string, { symbol: string; color: string }> = {
   H: { symbol: '♥', color: 'text-red-500' },
@@ -94,8 +95,8 @@ export function GameCard({
         </span>
       </div>
       {showCharge > 0 && (
-        <div className="absolute -top-2 -right-2 bg-gradient-to-r from-yellow-500 to-amber-600 text-zinc-950 border border-yellow-200 text-[0.65em] font-black w-[1.35em] h-[1.35em] rounded-full flex items-center justify-center shadow-lg animate-bounce">
-          +{showCharge}
+        <div className="absolute -top-2 -right-2 bg-gradient-to-r from-yellow-500 to-amber-600 text-zinc-950 border border-yellow-200 text-[0.65em] font-black min-w-[1.35em] h-[1.35em] px-0.5 rounded-full flex items-center justify-center shadow-lg animate-bounce">
+          +{showCharge * CHARGE_BONUS_MULTIPLIER}
         </div>
       )}
     </div>
