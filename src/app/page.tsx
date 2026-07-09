@@ -20,7 +20,6 @@ export default function LobbyPage() {
     clearUISelections
   } = useGameStore();
 
-  const [isLoginTab, setIsLoginTab] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [joinCode, setJoinCode] = useState('');
@@ -40,18 +39,9 @@ export default function LobbyPage() {
       return;
     }
 
-    if (isLoginTab) {
-      const success = await login(email, password);
-      if (success) {
-        setActionError(null);
-      }
-    } else {
-      const success = await register(email, password);
-      if (success) {
-        setIsLoginTab(true);
-        setActionError(null);
-        alert('註冊成功，請登入！');
-      }
+    const success = await login(email, password);
+    if (success) {
+      setActionError(null);
     }
   };
 
@@ -190,38 +180,16 @@ export default function LobbyPage() {
           </div>
         </div>
       ) : (
-        /* 未登入：顯示登入/註冊表單 */
+        /* 未登入：顯示登入表單 */
         <div className="w-full max-w-md washi-paper rounded-xl p-6 md:p-8 shadow-2xl relative border-t-4 border-t-yamabuki-gold">
-          {/* Tabs */}
-          <div className="flex border-b border-foreground/10 mb-6">
-            <button
-              onClick={() => {
-                setIsLoginTab(true);
-                setActionError(null);
-              }}
-              className={`flex-1 pb-3 text-sm font-serif font-bold tracking-widest transition-all flex items-center justify-center space-x-1 border-b-2 ${
-                isLoginTab
-                  ? 'border-yamabuki-gold text-yamabuki-gold'
-                  : 'border-transparent text-foreground/50 hover:text-foreground/80'
-              }`}
-            >
-              <LogIn className="w-4 h-4" />
-              <span>入陣登入</span>
-            </button>
-            <button
-              onClick={() => {
-                setIsLoginTab(false);
-                setActionError(null);
-              }}
-              className={`flex-1 pb-3 text-sm font-serif font-bold tracking-widest transition-all flex items-center justify-center space-x-1 border-b-2 ${
-                !isLoginTab
-                  ? 'border-yamabuki-gold text-yamabuki-gold'
-                  : 'border-transparent text-foreground/50 hover:text-foreground/80'
-              }`}
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>招募註冊</span>
-            </button>
+          <div className="text-center mb-6">
+            <h2 className="text-lg font-serif font-bold text-yamabuki-gold tracking-widest flex items-center justify-center space-x-1.5">
+              <LogIn className="w-5 h-5 text-shiko-red" />
+              <span>將領登入入陣</span>
+            </h2>
+            <p className="text-[10px] text-foreground/45 mt-1">
+              ※ 若帳號不存在，系統將自動為您創立帳號並登入。
+            </p>
           </div>
 
           {(error || actionError) && (
@@ -266,17 +234,8 @@ export default function LobbyPage() {
               disabled={isLoading}
               className="w-full bg-shiko-red hover:bg-red-700 text-white font-serif font-bold py-2.5 px-4 rounded transition-all shadow-lg hover:shadow-shiko-red/20 mt-6 tracking-widest flex items-center justify-center space-x-2 border border-shiko-red/30"
             >
-              {isLoginTab ? (
-                <>
-                  <LogIn className="w-4 h-4" />
-                  <span>進入大廳</span>
-                </>
-              ) : (
-                <>
-                  <UserPlus className="w-4 h-4" />
-                  <span>創建將領帳號</span>
-                </>
-              )}
+              <LogIn className="w-4 h-4" />
+              <span>進入大廳 / 登入</span>
             </button>
           </form>
         </div>
