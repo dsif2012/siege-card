@@ -130,15 +130,38 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
   const isLocalGuest = gameState.player2.id === 'guest';
   const isPlayer1 = room.player1Id === user?.id;
   const isPlayer2 = room.player2Id === user?.id;
+
+  // 決定當前應操作的角色 ID 與姓名 (直接在 render 中計算，更安全防手震)
+  let currentActorId = '';
+  let currentActorName = '';
+  if (gameState) {
+    if (gameState.phase === 'setup') {
+      if (!gameState.setupState?.player1Ready) {
+        currentActorId = gameState.player1.id;
+        currentActorName = gameState.player1.email;
+      } else {
+        currentActorId = gameState.player2.id;
+        currentActorName = gameState.player2.email;
+      }
+    } else if (gameState.phase === 'wall_breached_response' && gameState.breachedResponseState) {
+      currentActorId = gameState.breachedResponseState.defenderId;
+      currentActorName = currentActorId === gameState.player1.id ? gameState.player1.email : gameState.player2.email;
+    } else {
+      currentActorId = gameState.activePlayerId;
+      currentActorName = currentActorId === gameState.player1.id ? gameState.player1.email : gameState.player2.email;
+    }
+  }
   
   // 決定目前瀏覽器使用者是否能夠操作
   const canIControl = isLocalGuest
     ? isPlayer1 // 本機模式下，只有房主 (Player 1) 可以操控
-    : (activeActorId === room.player1Id && isPlayer1) || (activeActorId === room.player2Id && isPlayer2);
+    : (currentActorId === room.player1Id && isPlayer1) || (currentActorId === room.player2Id && isPlayer2);
 
   // 取得玩家與對手的視角
-  // 如果是 Player 2 連線進來，則將 Player 2 顯示在下方，Player 1 顯示在上方
-  const isP2View = !isLocalGuest && isPlayer2;
+  // 如果是 Player 2 連線進來 (或者本機熱座輪到 Player 2)，則將 Player 2 顯示在下方，Player 1 顯示在上方
+  const isP2View = isLocalGuest
+    ? (currentActorId === gameState.player2.id)
+    : isPlayer2;
   const bottomPlayer = isP2View ? gameState.player2 : gameState.player1;
   const topPlayer = isP2View ? gameState.player1 : gameState.player2;
 
