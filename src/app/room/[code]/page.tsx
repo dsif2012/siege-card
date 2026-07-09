@@ -488,71 +488,132 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
               </span>
             </div>
 
-            {/* 對手三層城牆 (顯示順序：Wall 3, Wall 2, Wall 1) */}
-            <div className="grid grid-cols-3 gap-2">
-              {[2, 1, 0].map(wallIdx => {
-                const wall = topPlayer.walls[wallIdx];
-                const sum = getWallDefenseValue(wall);
-                const limit = wallLimits[wallIdx];
-                const isTarget = gameState.turnCount > 1 && 
-                                 !wall.breached && 
-                                 (topPlayer.walls.findIndex(w => !w.breached) === wallIdx);
+            {/* 對手三層圓弧城牆 (顯示為面向中央的半圓形城牆) */}
+            <div className="relative w-full max-w-[500px] aspect-[500/220] mx-auto select-none overflow-hidden bg-zinc-950/10 rounded-xl border border-foreground/5 p-1">
+              {/* SVG 圓弧城牆背景 */}
+              <svg viewBox="0 0 500 220" className="absolute inset-0 w-full h-full pointer-events-none">
+                {/* 裝飾櫻花瓣 */}
+                <path d="M 40 30 C 43 25, 48 25, 46 32 C 43 35, 38 33, 40 30 Z" fill="#fbcfe8" opacity="0.3" />
+                <path d="M 450 60 C 453 55, 458 55, 456 62 C 453 65, 448 63, 450 60 Z" fill="#fbcfe8" opacity="0.2" />
+                
+                {/* 對手本陣(Castle Keep) */}
+                <path d="M 235 0 L 235 25 L 240 25 L 240 30 L 245 30 L 245 25 L 250 25 L 250 30 L 255 30 L 255 25 L 260 25 L 260 30 L 265 30 L 265 25 L 265 0 Z" fill="#1c1917" stroke="#d33f49" strokeWidth="1.5" />
+                
+                {/* 三之丸 Wall 3 (R=65, Apex Y=65) */}
+                <path d="M 185 0 A 65 65 0 0 0 315 0" stroke={topPlayer.walls[2].breached ? "#7f1d1d" : "#71717a"} strokeWidth="5" fill="none" strokeDasharray={topPlayer.walls[2].breached ? "3 3" : "12 4"} />
+                
+                {/* 二之丸 Wall 2 (R=130, Apex Y=130) */}
+                <path d="M 120 0 A 130 130 0 0 0 380 0" stroke={topPlayer.walls[1].breached ? "#7f1d1d" : "#52525b"} strokeWidth="7" fill="none" strokeDasharray={topPlayer.walls[1].breached ? "3 3" : "14 5"} />
+                
+                {/* 一之丸 Wall 1 (R=195, Apex Y=195) */}
+                <path d="M 55 0 A 195 195 0 0 0 445 0" stroke={topPlayer.walls[0].breached ? "#7f1d1d" : "#3f3f46"} strokeWidth="9" fill="none" strokeDasharray={topPlayer.walls[0].breached ? "3 3" : "16 6"} />
+              </svg>
 
-                return (
-                  <div
-                    key={wallIdx}
-                    onClick={() => {
-                      if (extraActionType !== 'none' && canIControl && !wall.breached) {
-                        // 破勢或偵查選擇對方城牆
-                        // 這裡不需動作，點擊裡面的卡牌才會觸發
-                      }
-                    }}
-                    className={`washi-paper rounded-lg p-2 transition-all border ${
-                      wall.breached
-                        ? 'border-dashed border-red-950 bg-red-950/10'
-                        : isTarget
-                          ? 'border-shiko-red ring-1 ring-shiko-red bg-shiko-red/5'
-                          : 'border-foreground/10'
-                    }`}
-                  >
-                    <div className="flex justify-between items-center mb-2">
-                      <span className={`text-[10px] font-bold ${wall.breached ? 'text-shiko-red' : 'text-foreground/70'}`}>
-                        {wallIdx === 0 ? '首關 (Wall 1)' : wallIdx === 1 ? '次關 (Wall 2)' : '本丸 (Wall 3)'}
-                      </span>
-                      {wall.breached ? (
-                        <span className="text-[9px] bg-red-950 text-shiko-red font-serif px-1 rounded animate-pulse">破</span>
-                      ) : (
-                        <span className="text-[9px] font-mono text-foreground/50">
-                          {sum}/{limit}
-                        </span>
-                      )}
-                    </div>
-                    {/* 城牆內的防守牌列表 */}
-                    <div className="flex flex-wrap gap-1 min-h-[48px] justify-center items-center">
-                      {!wall.breached && wall.cards.map((card, cardIdx) => {
-                        const isSelected = selectedOpponentWallIndex === wallIdx && selectedOpponentWallCardIndexes.includes(cardIdx);
-                        const isPublic = wall.revealed[cardIdx];
-                        
-                        return (
-                          <RenderCard
-                            key={cardIdx}
-                            card={card}
-                            isFlipped={!isPublic}
-                            isSelected={isSelected}
-                            onClick={() => {
-                              if (canIControl && !wall.breached && extraActionType !== 'none') {
-                                if (!isPublic) {
-                                  toggleOpponentCardSelection(wallIdx, cardIdx);
-                                }
-                              }
-                            }}
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
+              {/* Wall 3 卡牌 (Apex Y = 65) */}
+              <div 
+                className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center"
+                style={{ top: '55px' }}
+              >
+                <div className={`flex items-center space-x-1 bg-zinc-900/90 border border-foreground/10 px-1.5 py-0.5 rounded text-[8px] font-mono leading-none ${topPlayer.walls[2].breached ? 'text-shiko-red border-shiko-red/30 bg-red-950/20' : 'text-foreground/75'}`}>
+                  <span>本丸 (W3)：</span>
+                  {topPlayer.walls[2].breached ? (
+                    <span className="font-bold text-shiko-red">破</span>
+                  ) : (
+                    <span>{getWallDefenseValue(topPlayer.walls[2])}/{wallLimits[2]}</span>
+                  )}
+                </div>
+                <div className="flex gap-1 mt-1 justify-center items-center scale-90 origin-top">
+                  {!topPlayer.walls[2].breached && topPlayer.walls[2].cards.map((card, cardIdx) => {
+                    const isSelected = selectedOpponentWallIndex === 2 && selectedOpponentWallCardIndexes.includes(cardIdx);
+                    const isPublic = topPlayer.walls[2].revealed[cardIdx];
+                    return (
+                      <RenderCard
+                        key={cardIdx}
+                        card={card}
+                        isFlipped={!isPublic}
+                        isSelected={isSelected}
+                        onClick={() => {
+                          if (canIControl && extraActionType !== 'none') {
+                            if (!isPublic) toggleOpponentCardSelection(2, cardIdx);
+                          }
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Wall 2 卡牌 (Apex Y = 130) */}
+              <div 
+                className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center"
+                style={{ top: '120px' }}
+              >
+                <div className={`flex items-center space-x-1 bg-zinc-900/90 border border-foreground/10 px-1.5 py-0.5 rounded text-[8px] font-mono leading-none ${topPlayer.walls[1].breached ? 'text-shiko-red border-shiko-red/30 bg-red-950/20' : 'text-foreground/75'}`}>
+                  <span>二關 (W2)：</span>
+                  {topPlayer.walls[1].breached ? (
+                    <span className="font-bold text-shiko-red">破</span>
+                  ) : (
+                    <span>{getWallDefenseValue(topPlayer.walls[1])}/{wallLimits[1]}</span>
+                  )}
+                </div>
+                <div className="flex gap-1 mt-1 justify-center items-center scale-90 origin-top">
+                  {!topPlayer.walls[1].breached && topPlayer.walls[1].cards.map((card, cardIdx) => {
+                    const isSelected = selectedOpponentWallIndex === 1 && selectedOpponentWallCardIndexes.includes(cardIdx);
+                    const isPublic = topPlayer.walls[1].revealed[cardIdx];
+                    return (
+                      <RenderCard
+                        key={cardIdx}
+                        card={card}
+                        isFlipped={!isPublic}
+                        isSelected={isSelected}
+                        onClick={() => {
+                          if (canIControl && extraActionType !== 'none') {
+                            if (!isPublic) toggleOpponentCardSelection(1, cardIdx);
+                          }
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Wall 1 卡牌 (Apex Y = 195) */}
+              <div 
+                className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center"
+                style={{ top: '185px' }}
+              >
+                {/* 特殊目標標記 (若為進攻首要目標，加強紅圈發光) */}
+                {gameState.turnCount > 1 && !topPlayer.walls[0].breached && (
+                  <div className="absolute -inset-1 rounded border border-shiko-red/30 animate-pulse pointer-events-none"></div>
+                )}
+                <div className={`flex items-center space-x-1 bg-zinc-900/90 border border-foreground/10 px-1.5 py-0.5 rounded text-[8px] font-mono leading-none ${topPlayer.walls[0].breached ? 'text-shiko-red border-shiko-red/30 bg-red-950/20' : 'text-foreground/75 border-yamabuki-gold/45'}`}>
+                  <span>首關 (W1)：</span>
+                  {topPlayer.walls[0].breached ? (
+                    <span className="font-bold text-shiko-red">破</span>
+                  ) : (
+                    <span>{getWallDefenseValue(topPlayer.walls[0])}/{wallLimits[0]}</span>
+                  )}
+                </div>
+                <div className="flex gap-1 mt-1 justify-center items-center scale-90 origin-top">
+                  {!topPlayer.walls[0].breached && topPlayer.walls[0].cards.map((card, cardIdx) => {
+                    const isSelected = selectedOpponentWallIndex === 0 && selectedOpponentWallCardIndexes.includes(cardIdx);
+                    const isPublic = topPlayer.walls[0].revealed[cardIdx];
+                    return (
+                      <RenderCard
+                        key={cardIdx}
+                        card={card}
+                        isFlipped={!isPublic}
+                        isSelected={isSelected}
+                        onClick={() => {
+                          if (canIControl && extraActionType !== 'none') {
+                            if (!isPublic) toggleOpponentCardSelection(0, cardIdx);
+                          }
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
             {/* 對手攻擊區 */}
@@ -686,58 +747,119 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
               </div>
             </div>
 
-            {/* 己方三層城牆 (顯示順序：Wall 1, Wall 2, Wall 3) */}
-            <div className="grid grid-cols-3 gap-2">
-              {[0, 1, 2].map(wallIdx => {
-                const wall = bottomPlayer.walls[wallIdx];
-                const sum = getWallDefenseValue(wall);
-                const limit = wallLimits[wallIdx];
-                const isSelected = selectedWallIndex === wallIdx;
+            {/* 己方三層圓弧城牆 (顯示為面向中央的半圓形城牆) */}
+            <div className="relative w-full max-w-[500px] aspect-[500/220] mx-auto select-none overflow-hidden bg-zinc-950/10 rounded-xl border border-foreground/5 p-1">
+              {/* SVG 圓弧城牆背景 */}
+              <svg viewBox="0 0 500 220" className="absolute inset-0 w-full h-full pointer-events-none">
+                {/* 裝飾櫻花瓣 */}
+                <path d="M 80 180 C 83 175, 88 175, 86 182 C 83 185, 78 183, 80 180 Z" fill="#fbcfe8" opacity="0.25" />
+                <path d="M 420 140 C 423 135, 428 135, 426 142 C 423 145, 418 143, 420 140 Z" fill="#fbcfe8" opacity="0.3" />
+                
+                {/* 己方本陣 (Castle Keep) */}
+                <path d="M 235 220 L 235 195 L 240 195 L 240 190 L 245 190 L 245 195 L 250 195 L 250 190 L 255 190 L 255 195 L 260 195 L 260 190 L 265 190 L 265 195 L 265 220 Z" fill="#1c1917" stroke="#d4af37" strokeWidth="1.5" />
+                
+                {/* 三之丸 Wall 3 (R=65, Apex Y=155) */}
+                <path d="M 185 220 A 65 65 0 0 1 315 220" stroke={bottomPlayer.walls[2].breached ? "#7f1d1d" : "#71717a"} strokeWidth="5" fill="none" strokeDasharray={bottomPlayer.walls[2].breached ? "3 3" : "12 4"} />
+                
+                {/* 二之丸 Wall 2 (R=130, Apex Y=90) */}
+                <path d="M 120 220 A 130 130 0 0 1 380 220" stroke={bottomPlayer.walls[1].breached ? "#7f1d1d" : "#52525b"} strokeWidth="7" fill="none" strokeDasharray={bottomPlayer.walls[1].breached ? "3 3" : "14 5"} />
+                
+                {/* 一之丸 Wall 1 (R=195, Apex Y=25) */}
+                <path d="M 55 220 A 195 195 0 0 1 445 220" stroke={bottomPlayer.walls[0].breached ? "#7f1d1d" : "#3f3f46"} strokeWidth="9" fill="none" strokeDasharray={bottomPlayer.walls[0].breached ? "3 3" : "16 6"} />
+              </svg>
 
-                return (
-                  <div
-                    key={wallIdx}
-                    onClick={() => {
-                      if (canIControl && !wall.breached) {
-                        selectWallIndex(isSelected ? null : wallIdx);
-                      }
-                    }}
-                    className={`washi-paper rounded-lg p-2 transition-all border cursor-pointer ${
-                      wall.breached
-                        ? 'border-dashed border-red-950 bg-red-950/10 cursor-not-allowed'
-                        : isSelected
-                          ? 'border-yamabuki-gold ring-1 ring-yamabuki-gold bg-yamabuki-gold/5 scale-[1.01]'
-                          : 'border-foreground/10 hover:border-foreground/20'
-                    }`}
-                  >
-                    <div className="flex justify-between items-center mb-2">
-                      <span className={`text-[10px] font-bold ${wall.breached ? 'text-shiko-red' : 'text-foreground/70'}`}>
-                        {wallIdx === 0 ? '首關 (Wall 1)' : wallIdx === 1 ? '次關 (Wall 2)' : '本丸 (Wall 3)'}
-                      </span>
-                      {wall.breached ? (
-                        <span className="text-[9px] bg-red-950 text-shiko-red font-serif px-1 rounded animate-pulse">破</span>
-                      ) : (
-                        <span className="text-[9px] font-mono text-foreground/50">
-                          {sum}/{limit}
-                        </span>
-                      )}
-                    </div>
-                    {/* 城牆內的防守牌列表 */}
-                    <div className="flex flex-wrap gap-1 min-h-[48px] justify-center items-center">
-                      {!wall.breached && wall.cards.map((card, cardIdx) => {
-                        const isPublic = wall.revealed[cardIdx];
-                        return (
-                          <RenderCard
-                            key={cardIdx}
-                            card={card}
-                            isFlipped={!isPublic}
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
+              {/* Wall 1 卡牌 (Apex Y = 25) */}
+              <div 
+                className={`absolute left-1/2 -translate-x-1/2 flex flex-col items-center cursor-pointer transition-all ${selectedWallIndex === 0 ? 'scale-102' : ''}`}
+                style={{ top: '5px' }}
+                onClick={() => {
+                  if (canIControl && !bottomPlayer.walls[0].breached) {
+                    selectWallIndex(selectedWallIndex === 0 ? null : 0);
+                  }
+                }}
+              >
+                <div className={`flex items-center space-x-1 bg-zinc-900/90 border px-1.5 py-0.5 rounded text-[8px] font-mono leading-none ${
+                  bottomPlayer.walls[0].breached 
+                    ? 'text-shiko-red border-shiko-red/30 bg-red-950/20' 
+                    : selectedWallIndex === 0 
+                      ? 'border-yamabuki-gold text-yamabuki-gold shadow-[0_0_4px_rgba(212,175,55,0.4)]'
+                      : 'border-foreground/10 text-foreground/75'
+                }`}>
+                  <span>首關 (W1)：</span>
+                  {bottomPlayer.walls[0].breached ? (
+                    <span className="font-bold text-shiko-red">破</span>
+                  ) : (
+                    <span>{getWallDefenseValue(bottomPlayer.walls[0])}/{wallLimits[0]}</span>
+                  )}
+                </div>
+                <div className="flex gap-1 mt-1 justify-center items-center scale-90 origin-top">
+                  {!bottomPlayer.walls[0].breached && bottomPlayer.walls[0].cards.map((card, cardIdx) => (
+                    <RenderCard key={cardIdx} card={card} />
+                  ))}
+                </div>
+              </div>
+
+              {/* Wall 2 卡牌 (Apex Y = 90) */}
+              <div 
+                className={`absolute left-1/2 -translate-x-1/2 flex flex-col items-center cursor-pointer transition-all ${selectedWallIndex === 1 ? 'scale-102' : ''}`}
+                style={{ top: '70px' }}
+                onClick={() => {
+                  if (canIControl && !bottomPlayer.walls[1].breached) {
+                    selectWallIndex(selectedWallIndex === 1 ? null : 1);
+                  }
+                }}
+              >
+                <div className={`flex items-center space-x-1 bg-zinc-900/90 border px-1.5 py-0.5 rounded text-[8px] font-mono leading-none ${
+                  bottomPlayer.walls[1].breached 
+                    ? 'text-shiko-red border-shiko-red/30 bg-red-950/20' 
+                    : selectedWallIndex === 1 
+                      ? 'border-yamabuki-gold text-yamabuki-gold shadow-[0_0_4px_rgba(212,175,55,0.4)]'
+                      : 'border-foreground/10 text-foreground/75'
+                }`}>
+                  <span>二關 (W2)：</span>
+                  {bottomPlayer.walls[1].breached ? (
+                    <span className="font-bold text-shiko-red">破</span>
+                  ) : (
+                    <span>{getWallDefenseValue(bottomPlayer.walls[1])}/{wallLimits[1]}</span>
+                  )}
+                </div>
+                <div className="flex gap-1 mt-1 justify-center items-center scale-90 origin-top">
+                  {!bottomPlayer.walls[1].breached && bottomPlayer.walls[1].cards.map((card, cardIdx) => (
+                    <RenderCard key={cardIdx} card={card} />
+                  ))}
+                </div>
+              </div>
+
+              {/* Wall 3 卡牌 (Apex Y = 155) */}
+              <div 
+                className={`absolute left-1/2 -translate-x-1/2 flex flex-col items-center cursor-pointer transition-all ${selectedWallIndex === 2 ? 'scale-102' : ''}`}
+                style={{ top: '135px' }}
+                onClick={() => {
+                  if (canIControl && !bottomPlayer.walls[2].breached) {
+                    selectWallIndex(selectedWallIndex === 2 ? null : 2);
+                  }
+                }}
+              >
+                <div className={`flex items-center space-x-1 bg-zinc-900/90 border px-1.5 py-0.5 rounded text-[8px] font-mono leading-none ${
+                  bottomPlayer.walls[2].breached 
+                    ? 'text-shiko-red border-shiko-red/30 bg-red-950/20' 
+                    : selectedWallIndex === 2 
+                      ? 'border-yamabuki-gold text-yamabuki-gold shadow-[0_0_4px_rgba(212,175,55,0.4)]'
+                      : 'border-foreground/10 text-foreground/75'
+                }`}>
+                  <span>本丸 (W3)：</span>
+                  {bottomPlayer.walls[2].breached ? (
+                    <span className="font-bold text-shiko-red">破</span>
+                  ) : (
+                    <span>{getWallDefenseValue(bottomPlayer.walls[2])}/{wallLimits[2]}</span>
+                  )}
+                </div>
+                <div className="flex gap-1 mt-1 justify-center items-center scale-90 origin-top">
+                  {!bottomPlayer.walls[2].breached && bottomPlayer.walls[2].cards.map((card, cardIdx) => (
+                    <RenderCard key={cardIdx} card={card} />
+                  ))}
+                </div>
+              </div>
             </div>
 
             {/* 己方資訊與手牌 */}
