@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
 
       if (room.player1Id === user.id) {
         return {
-          error: `此房間房主是 ${room.player1.email}，您目前也是用這個帳號登入。線上對戰需要兩個不同帳號：請在另一瀏覽器／無痕視窗用「另一個 email」登入後再加入。`,
+          error: `身分衝突：此房房主是 ${room.player1.email}，但您目前 cookie 登入也是 ${user.email}（同一帳號）。若您剛換成另一帳號，請先「解甲登出」再重新登入，或清除此網站 Cookie 後重試。`,
           status: 400 as const,
         };
       }

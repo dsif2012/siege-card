@@ -70,12 +70,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   fetchUser: async () => {
     try {
-      const res = await fetch('/api/auth/me');
+      const res = await fetch('/api/auth/me', { credentials: 'include' });
       const data = await res.json();
       if (data.user) {
         set({ user: data.user });
         return data.user;
       }
+      set({ user: null });
       return null;
     } catch {
       return null;
@@ -88,12 +89,24 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email, password }),
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '登入失敗');
-      set({ user: data.user, isLoading: false });
+
+      // 以 cookie 實際身分為準，避免畫面與 session 不一致
+      const meRes = await fetch('/api/auth/me', { credentials: 'include' });
+      const meData = await meRes.json();
+      const sessionUser = meData.user;
+      if (!sessionUser || sessionUser.id !== data.user.id) {
+        throw new Error(
+          `登入 session 未正確寫入（畫面 ${data.user.email}，cookie ${sessionUser?.email ?? '空'}）。請清除網站 Cookie 後重試。`
+        );
+      }
+
+      set({ user: sessionUser, isLoading: false });
       return true;
     } catch (err: any) {
       set({ error: err.message, isLoading: false });
@@ -107,6 +120,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
@@ -121,7 +135,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   logout: async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
       set({ user: null, room: null, gameState: null });
     } catch (e) {
       console.error(e);
@@ -134,6 +148,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const res = await fetch('/api/rooms/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ localGuest }),
       });
       const data = await res.json();
@@ -152,6 +167,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const res = await fetch('/api/rooms/join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ code }),
       });
       const data = await res.json();
@@ -166,7 +182,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   fetchRoom: async (code) => {
     try {
-      const res = await fetch(`/api/rooms/${code.toUpperCase()}`);
+      const res = await fetch(`/api/rooms/${code.toUpperCase()}`, { credentials: 'include' });
       if (!res.ok) return;
       const data = await res.json();
       // 僅在有變動時更新，避免頻繁渲染
@@ -185,6 +201,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const res = await fetch(`/api/rooms/${code.toUpperCase()}/action`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ action, payload }),
       });
       const data = await res.json();
@@ -214,6 +231,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const res = await fetch(`/api/rooms/${code.toUpperCase()}/action`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ action: 'restart' }),
       });
       const data = await res.json();

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import db from '@/lib/db';
 import { signToken } from '@/lib/auth';
+import { setSessionCookie } from '@/lib/session-cookie';
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,14 +18,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 尋找使用者
     let user = await db.user.findUnique({
       where: { email: rawEmail },
     });
 
     let isNewUser = false;
     if (!user) {
-      // 帳號不存在，自動註冊並登入
       const passwordHash = await bcrypt.hash(rawPassword, 10);
       user = await db.user.create({
         data: {
@@ -34,7 +33,6 @@ export async function POST(req: NextRequest) {
       });
       isNewUser = true;
     } else {
-      // 帳號已存在，驗證密碼
       const passwordMatch = await bcrypt.compare(rawPassword, user.passwordHash);
       if (!passwordMatch) {
         return NextResponse.json(
@@ -44,10 +42,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 簽發 JWT Token
     const token = signToken({ id: user.id, email: user.email });
 
-    // 建立回應並設定 HTTP-only Cookie
     const response = NextResponse.json({
       message: isNewUser ? '已自動註冊並登入' : '登入成功',
       user: {
@@ -56,13 +52,8 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    response.cookies.set('session', token, {
-      httpOnly: true,
-      path: '/',
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7, // 7 天
-    });
+    // 強制覆寫舊 session，避免 UI 顯示新帳號但 cookie 仍是舊帳號
+    setSessionCookie(response, token);
 
     return response;
   } catch (error: any) {
