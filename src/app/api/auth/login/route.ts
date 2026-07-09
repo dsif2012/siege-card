@@ -7,7 +7,10 @@ export async function POST(req: NextRequest) {
   try {
     const { email, password } = await req.json();
 
-    if (!email || !password) {
+    const rawEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    const rawPassword = typeof password === 'string' ? password : '';
+
+    if (!rawEmail || !rawPassword) {
       return NextResponse.json(
         { error: '請輸入電子郵件與密碼' },
         { status: 400 }
@@ -16,23 +19,23 @@ export async function POST(req: NextRequest) {
 
     // 尋找使用者
     let user = await db.user.findUnique({
-      where: { email },
+      where: { email: rawEmail },
     });
 
     let isNewUser = false;
     if (!user) {
       // 帳號不存在，自動註冊並登入
-      const passwordHash = await bcrypt.hash(password, 10);
+      const passwordHash = await bcrypt.hash(rawPassword, 10);
       user = await db.user.create({
         data: {
-          email,
+          email: rawEmail,
           passwordHash,
         },
       });
       isNewUser = true;
     } else {
       // 帳號已存在，驗證密碼
-      const passwordMatch = await bcrypt.compare(password, user.passwordHash);
+      const passwordMatch = await bcrypt.compare(rawPassword, user.passwordHash);
       if (!passwordMatch) {
         return NextResponse.json(
           { error: '密碼不正確' },
@@ -46,7 +49,7 @@ export async function POST(req: NextRequest) {
 
     // 建立回應並設定 HTTP-only Cookie
     const response = NextResponse.json({
-      message: '登入成功',
+      message: isNewUser ? '已自動註冊並登入' : '登入成功',
       user: {
         id: user.id,
         email: user.email,

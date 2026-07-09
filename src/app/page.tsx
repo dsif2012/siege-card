@@ -100,6 +100,9 @@ export default function LobbyPage() {
               <h2 className="text-sm md:text-base font-bold text-foreground/80 truncate max-w-[200px]">
                 {user.email}
               </h2>
+              <p className="text-[9px] text-foreground/30 font-mono mt-0.5 truncate max-w-[200px]" title={user.id}>
+                id: {user.id.slice(0, 8)}…
+              </p>
             </div>
             <button
               onClick={() => logout()}
@@ -174,7 +177,7 @@ export default function LobbyPage() {
                 </button>
               </form>
               <p className="text-[10px] text-foreground/40 text-center leading-relaxed">
-                兩名玩家登入不同帳號，輸入相同的房間代碼，即可跨瀏覽器同步對戰。
+                兩名玩家須用<strong className="text-foreground/60">不同 email 帳號</strong>登入（例如 Chrome 一個、無痕／另一瀏覽器另一個），輸入相同房間代碼即可對戰。同一帳號開兩個視窗會被判定為同一人。
               </p>
             </div>
           </div>

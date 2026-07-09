@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
 
       if (room.player1Id === user.id) {
         return {
-          error: '您是房主，不能加入自己建立的房間。請提供房間代碼給另一位玩家加入',
+          error: `此房間房主是 ${room.player1.email}，您目前也是用這個帳號登入。線上對戰需要兩個不同帳號：請在另一瀏覽器／無痕視窗用「另一個 email」登入後再加入。`,
           status: 400 as const,
         };
       }
