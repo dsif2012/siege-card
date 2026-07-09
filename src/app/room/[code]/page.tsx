@@ -519,7 +519,7 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
         />
       </div>
 
-      {/* Hand Dock */}
+      {/* Hand Dock（setup 時把確認／提示併入底欄，避免多佔一列被切掉） */}
       <HandDock
         cards={handCardsToShow}
         selectedCardIds={selectedHandCardIds}
@@ -560,34 +560,51 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
           }
         }}
         replaceCount={replaceAttackIds.length > 0 ? replaceAttackIds.length : undefined}
+        trailingAction={
+          gameState.phase === 'setup' ? (
+            setupCommitted ? (
+              <span className="text-[9px] text-sky-300/70 tracking-wider shrink-0">已就緒 · 等待對手</span>
+            ) : setupIsReady && canIControl ? (
+              <button onClick={handleSetupSubmit} className="btn-primary text-[10px] px-3 py-1.5 shrink-0">
+                確認部署
+              </button>
+            ) : (
+              <span className="text-[9px] text-foreground/35 tracking-wider shrink-0 hidden sm:inline">
+                拖放或點選至城牆／攻擊區
+              </span>
+            )
+          ) : undefined
+        }
       />
 
-      {/* Action Dock */}
-      <ActionDock
-        phase={gameState.phase}
-        canIControl={canIControl}
-        setupIsReady={setupIsReady}
-        setupCommitted={setupCommitted}
-        onSetupSubmit={handleSetupSubmit}
-        onPlaceAttack={handlePlaceAttack}
-        onPlaceDefense={handlePlaceDefense}
-        onCharge={handleCharge}
-        extraActionType={extraActionType}
-        setExtraActionType={setExtraActionType}
-        hasDoneExtraAction={gameState.hasDoneExtraAction}
-        turnCount={gameState.turnCount}
-        onDraw2={handleDraw2}
-        onAttack={handleAttack}
-        onScout={handleScout}
-        onDisrupt={handleDisrupt}
-        onEndTurn={handleEndTurn}
-        onClearSelections={clearUISelections}
-        isBreachPhase={gameState.phase === 'wall_breached_response' && !!gameState.breachedResponseState}
-        onBreachResponse={handleBreachResponseSubmit}
-        onBreachSkip={() => submitAction(code, 'respond_breach', { placements: [] })}
-        winnerEmail={gameState.winnerId === bottomPlayer.id ? bottomPlayer.email : topPlayer.email}
-        onRestart={() => restartGame(code)}
-      />
+      {/* Action Dock：setup 已併入手牌列，其餘階段才顯示 */}
+      {gameState.phase !== 'setup' && (
+        <ActionDock
+          phase={gameState.phase}
+          canIControl={canIControl}
+          setupIsReady={setupIsReady}
+          setupCommitted={setupCommitted}
+          onSetupSubmit={handleSetupSubmit}
+          onPlaceAttack={handlePlaceAttack}
+          onPlaceDefense={handlePlaceDefense}
+          onCharge={handleCharge}
+          extraActionType={extraActionType}
+          setExtraActionType={setExtraActionType}
+          hasDoneExtraAction={gameState.hasDoneExtraAction}
+          turnCount={gameState.turnCount}
+          onDraw2={handleDraw2}
+          onAttack={handleAttack}
+          onScout={handleScout}
+          onDisrupt={handleDisrupt}
+          onEndTurn={handleEndTurn}
+          onClearSelections={clearUISelections}
+          isBreachPhase={gameState.phase === 'wall_breached_response' && !!gameState.breachedResponseState}
+          onBreachResponse={handleBreachResponseSubmit}
+          onBreachSkip={() => submitAction(code, 'respond_breach', { placements: [] })}
+          winnerEmail={gameState.winnerId === bottomPlayer.id ? bottomPlayer.email : topPlayer.email}
+          onRestart={() => restartGame(code)}
+        />
+      )}
 
       {/* Log Drawer */}
       <LogDrawer logs={gameState.logs} isOpen={isLogOpen} onClose={() => setIsLogOpen(false)} />
@@ -601,7 +618,7 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
               <span>探子來報：城防偵查結果</span>
             </h3>
             <p className="text-xs text-foreground/70 leading-relaxed">
-              您所派遣的密探成功偵查到對手防線卡牌，請迅速查閱並規劃策略。
+              密探回報如下。這些防禦牌已永久公開，關閉後仍會維持翻開。
             </p>
             <div className="flex gap-3 justify-center py-2">
               {scoutedCards.map((card, idx) => (
@@ -612,7 +629,7 @@ export default function GameRoomPage({ params: paramsPromise }: { params: Promis
               onClick={() => setScoutedCards(null)}
               className="btn-primary py-2 px-6 rounded tracking-wider"
             >
-              微臣遵旨 (關閉並遮蔽)
+              已知悉
             </button>
           </div>
         </div>

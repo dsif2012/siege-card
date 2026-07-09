@@ -16,7 +16,7 @@ export interface AttackCard {
 export interface Wall {
   cards: Card[];       // 該城牆上的防守牌列表
   breached: boolean;   // 是否已被攻破
-  revealed: boolean[]; // 每張防守牌是否已公開 (對應 cards 索引，被偵查或破勢時設為 true)
+  revealed: boolean[]; // 每張防守牌是否已公開（對應 cards 索引；偵查／破勢後永久公開）
 }
 
 export interface PlayerState {

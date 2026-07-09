@@ -81,7 +81,7 @@ export function SiegeAxis(props: SiegeAxisProps) {
         </g>
       </svg>
 
-      <div className="relative grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 sm:gap-3 px-2 py-2 min-h-[5rem] sm:min-h-[6rem]">
+      <div className="siege-axis__inner">
         {/* Left: top player (enemy) attack */}
         <div className="flex items-center gap-1.5 min-w-0 justify-start">
           <div className="hidden sm:flex flex-col items-center shrink-0 gap-0.5">
@@ -114,7 +114,7 @@ export function SiegeAxis(props: SiegeAxisProps) {
               );
             })}
             {topAttackZone.length === 0 && (
-              <div className="slot-empty slot-empty--red w-11 h-[3.75rem] sm:w-12 sm:h-16 md:w-14 md:h-20">
+              <div className="slot-empty slot-empty--red slot-card">
                 <span className="text-[8px] text-foreground/25">空</span>
               </div>
             )}
@@ -180,8 +180,10 @@ export function SiegeAxis(props: SiegeAxisProps) {
                     onDrop={drop?.onDrop}
                     onClick={drop?.onClick}
                     className={`${setupCommitted ? '' : 'cursor-pointer'} ${
-                      drop?.classNameHighlight ? 'slot-empty slot-empty--hot' : occupying ? '' : 'slot-empty slot-empty--gold'
-                    } ${occupying ? '' : 'w-11 h-[3.75rem] sm:w-12 sm:h-16 md:w-14 md:h-20'}`}
+                      occupying
+                        ? ''
+                        : `slot-empty slot-card ${drop?.classNameHighlight ? 'slot-empty--hot' : 'slot-empty--gold'}`
+                    }`}
                   >
                     {occupying ? (
                       <GameCard
@@ -222,7 +224,7 @@ export function SiegeAxis(props: SiegeAxisProps) {
                   );
                 })}
                 {bottomAttackZone.length === 0 && (
-                  <div className="slot-empty slot-empty--gold w-11 h-[3.75rem] sm:w-12 sm:h-16 md:w-14 md:h-20">
+                  <div className="slot-empty slot-empty--gold slot-card">
                     <span className="text-[8px] text-foreground/25">空</span>
                   </div>
                 )}

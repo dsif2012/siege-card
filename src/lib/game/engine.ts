@@ -127,10 +127,26 @@ export function getPlayers(state: GameState, playerId: string) {
   throw new Error('未知的玩家 ID');
 }
 
-// 計算城牆當前防禦值
+// 計算城牆當前防禦值（含未公開蓋牌；僅己方／結算用）
 export function getWallDefenseValue(wall: Wall): number {
   if (wall.breached) return 0;
   return wall.cards.reduce((sum, c) => sum + c.value, 0);
+}
+
+/** 對手視角：只加總已公開牌，避免蓋牌數值從徽章洩漏 */
+export function getKnownWallDefenseValue(wall: Wall): {
+  known: number;
+  hiddenCount: number;
+  totalCards: number;
+} {
+  if (wall.breached) return { known: 0, hiddenCount: 0, totalCards: 0 };
+  let known = 0;
+  let hiddenCount = 0;
+  wall.cards.forEach((card, idx) => {
+    if (wall.revealed[idx]) known += card.value;
+    else hiddenCount += 1;
+  });
+  return { known, hiddenCount, totalCards: wall.cards.length };
 }
 
 // 計算當前攻擊值
@@ -386,8 +402,7 @@ export function drawTwoCards(state: GameState, playerId: string): GameState {
   return state;
 }
 
-// 6. 額外行動 2：偵查 (查看對方任意 2 張蓋牌防禦牌，看完蓋回)
-// 此處 engine 只做基本驗證與 Log 記錄，實際在 API 回傳值中將這兩張牌回傳給前端顯示，但不改變 DB status 的 revealed 為 true
+// 6. 額外行動 2：偵查（查看對方 1~2 張蓋牌防禦牌，並永久公開）
 export function scoutDefense(
   state: GameState,
   playerId: string,
@@ -417,17 +432,21 @@ export function scoutDefense(
   }
 
   const scoutedCards: Card[] = [];
-  for (const idx of cardIndexes) {
+  const uniqueIndexes = [...new Set(cardIndexes)];
+  for (const idx of uniqueIndexes) {
     if (idx < 0 || idx >= targetWall.cards.length) {
       throw new Error('指定的卡牌索引無效');
     }
     if (targetWall.revealed[idx]) {
       throw new Error('該卡牌已是公開狀態，不需偵查');
     }
+    targetWall.revealed[idx] = true;
     scoutedCards.push(targetWall.cards[idx]);
   }
 
-  state.logs.push(`【額外行動】玩家 ${player.email} 對對手第 ${targetWallIndex + 1} 層城牆執行了偵查，探查了 ${scoutedCards.length} 張卡牌。`);
+  state.logs.push(
+    `【額外行動】玩家 ${player.email} 對對手第 ${targetWallIndex + 1} 層城牆執行偵查，永久公開：${scoutedCards.map(formatCard).join('、')}`,
+  );
   state.hasDoneExtraAction = true;
 
   return { state, scoutedCards };

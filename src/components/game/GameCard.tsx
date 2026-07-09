@@ -38,6 +38,12 @@ export function GameCard({
   onDragEnd,
 }: GameCardProps) {
   const isReallyFlipped = isFlipped || card.value === 0;
+  const interactive = onClick || draggable
+    ? `cursor-pointer hover:scale-105 ${draggable ? 'cursor-grab active:cursor-grabbing' : ''}`
+    : '';
+  const selected = isSelected
+    ? 'border-yamabuki-gold scale-105 ring-2 ring-yamabuki-gold shadow-[0_0_12px_rgba(212,175,55,0.8)]'
+    : '';
 
   if (isReallyFlipped) {
     return (
@@ -46,15 +52,13 @@ export function GameCard({
         draggable={draggable}
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
-        className={`game-card w-11 h-[3.75rem] sm:w-12 sm:h-16 lg:w-[3.25rem] lg:h-[4.5rem] rounded border-2 flex items-center justify-center ${
-          onClick || draggable ? 'cursor-pointer hover:scale-105' : ''
-        } ${draggable ? 'cursor-grab active:cursor-grabbing' : ''} ${
+        className={`game-card rounded border-2 flex items-center justify-center japanese-pattern ${interactive} ${
           isSelected
             ? 'border-yamabuki-gold scale-105 shadow-[0_0_8px_rgba(212,175,55,0.6)]'
             : 'border-red-950 shadow-md'
-        } japanese-pattern`}
+        }`}
       >
-        <div className="text-[10px] text-red-100/30 font-serif font-black tracking-widest pointer-events-none -rotate-12">
+        <div className="text-[0.85em] text-red-100/30 font-serif font-black tracking-widest pointer-events-none -rotate-12">
           軍
         </div>
       </div>
@@ -71,30 +75,26 @@ export function GameCard({
       draggable={draggable}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
-      className={`game-card w-11 h-[3.75rem] sm:w-12 sm:h-16 lg:w-[3.25rem] lg:h-[4.5rem] washi-card-light rounded border flex flex-col justify-between p-1 sm:p-1.5 relative ${
-        onClick || draggable ? 'cursor-pointer hover:scale-105' : ''
-      } ${draggable ? 'cursor-grab active:cursor-grabbing' : ''} ${
-        isSelected
-          ? 'border-yamabuki-gold scale-105 ring-2 ring-yamabuki-gold shadow-[0_0_12px_rgba(212,175,55,0.8)]'
-          : 'border-zinc-300 shadow-md'
+      className={`game-card washi-card-light rounded border flex flex-col justify-between relative ${interactive} ${
+        selected || 'border-zinc-300 shadow-md'
       } ${showCharge > 0 ? 'charge-glow' : ''}`}
     >
       <div className="flex flex-col leading-none items-start">
-        <span className={`text-[10px] sm:text-xs font-bold font-serif ${isRed ? 'text-shiko-red' : 'text-zinc-950'}`}>
+        <span className={`text-[1em] font-bold font-serif ${isRed ? 'text-shiko-red' : 'text-zinc-950'}`}>
           {valueLabel}
         </span>
-        <span className={`text-[8px] sm:text-[10px] ${suit.color}`}>{suit.symbol}</span>
+        <span className={`text-[0.75em] ${suit.color}`}>{suit.symbol}</span>
       </div>
-      <div className={`absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none text-lg sm:text-xl ${suit.color}`}>
+      <div className={`absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none text-[1.6em] ${suit.color}`}>
         {suit.symbol}
       </div>
       <div className="flex justify-end items-end leading-none">
-        <span className={`text-[8px] sm:text-[10px] font-bold font-serif ${isRed ? 'text-shiko-red' : 'text-zinc-950'}`}>
+        <span className={`text-[0.75em] font-bold font-serif ${isRed ? 'text-shiko-red' : 'text-zinc-950'}`}>
           {valueLabel}
         </span>
       </div>
       {showCharge > 0 && (
-        <div className="absolute -top-2 -right-2 sm:-top-2.5 sm:-right-2.5 bg-gradient-to-r from-yellow-500 to-amber-600 text-zinc-950 border border-yellow-200 text-[8px] sm:text-[9px] font-black w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center shadow-lg animate-bounce">
+        <div className="absolute -top-2 -right-2 bg-gradient-to-r from-yellow-500 to-amber-600 text-zinc-950 border border-yellow-200 text-[0.65em] font-black w-[1.35em] h-[1.35em] rounded-full flex items-center justify-center shadow-lg animate-bounce">
           +{showCharge}
         </div>
       )}

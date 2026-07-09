@@ -2,10 +2,12 @@
 
 import React from 'react';
 import type { Wall, Card, GamePhase } from '@/lib/game/types';
-import { getWallDefenseValue } from '@/lib/game/engine';
+import { getWallDefenseValue, getKnownWallDefenseValue } from '@/lib/game/engine';
 import { GameCard, getCardValueLabel } from './GameCard';
 
 const WALL_NAMES = ['首關', '二關', '本丸'] as const;
+/** 雙方皆左→右：首關｜二關｜本丸 */
+const TIER_ORDER = [0, 1, 2] as const;
 
 export interface WallArcProps {
   walls: Wall[];
@@ -55,31 +57,21 @@ export function WallArc(props: WallArcProps) {
   } = props;
 
   const isSetup = phase === 'setup';
-  const tierOrder = side === 'enemy' ? [2, 1, 0] : [0, 1, 2];
 
   return (
     <div className={`wall-stage ${side === 'enemy' ? 'wall-stage--enemy' : 'wall-stage--ally'}`}>
-      {/* Decorative gate */}
-      <div className="flex justify-center mb-1">
-        <svg width="48" height="16" viewBox="0 0 48 16" className={side === 'enemy' ? 'text-shiko-red/40' : 'text-yamabuki-gold/40'}>
-          <path d="M8 16V6l16-5 16 5v10" stroke="currentColor" strokeWidth="1.2" fill="currentColor" fillOpacity="0.08" />
-          <path d="M16 16v-6h4v6M28 16v-6h4v6" stroke="currentColor" strokeWidth="0.8" opacity="0.5" />
-        </svg>
-      </div>
+      <div className="wall-row" role="group" aria-label={side === 'enemy' ? '敵方城牆' : '己方城牆'}>
+        {TIER_ORDER.map((wallIndex) => {
+          const wall = walls[wallIndex];
+          const isFrontline = wallIndex === 0 && turnCount > 1;
 
-      {tierOrder.map((wallIndex, orderIdx) => {
-        const wall = walls[wallIndex];
-        const isFrontline = wallIndex === 0 && turnCount > 1;
-
-        return (
-          <React.Fragment key={wallIndex}>
-            {orderIdx > 0 && (
-              <div className={`wall-divider ${side === 'enemy' ? 'wall-divider--enemy' : 'wall-divider--ally'}`} />
-            )}
+          return (
             <div
-              className={`wall-tier ${isFrontline && side === 'enemy' && !wall.breached ? 'ring-1 ring-shiko-red/25 rounded-lg' : ''}`}
+              key={wallIndex}
+              className={`wall-tier ${
+                isFrontline && side === 'enemy' && !wall.breached ? 'wall-tier--frontline' : ''
+              }`}
             >
-              {/* Badge */}
               {side === 'enemy' ? (
                 <EnemyBadge wall={wall} wallIndex={wallIndex} wallLimit={wallLimits[wallIndex]} isFrontline={isFrontline} />
               ) : (
@@ -95,17 +87,16 @@ export function WallArc(props: WallArcProps) {
                 />
               )}
 
-              {/* Cards */}
               <div className="wall-tier__cards">
                 {side === 'enemy'
                   ? renderEnemyCards(wall, wallIndex, extraActionType, canIControl, selectedOpponentWallIndex ?? null, selectedOpponentWallCardIndexes, onEnemyCardClick)
-                  : renderAllyCards(wall, wallIndex, walls, isSetup, setupCommitted, displayCards, canIControl, setupSlotDropProps, onAllyWallClick, selectedWallIndex ?? null, onCardDragStart, onCardDragEnd)
+                  : renderAllyCards(wall, wallIndex, isSetup, setupCommitted, displayCards, canIControl, setupSlotDropProps, onAllyWallClick, selectedWallIndex ?? null, onCardDragStart, onCardDragEnd)
                 }
               </div>
             </div>
-          </React.Fragment>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -113,6 +104,21 @@ export function WallArc(props: WallArcProps) {
 /* ── Badge sub-components ── */
 
 function EnemyBadge({ wall, wallIndex, wallLimit, isFrontline }: { wall: Wall; wallIndex: number; wallLimit: number; isFrontline: boolean }) {
+  const { known, hiddenCount, totalCards } = getKnownWallDefenseValue(wall);
+  let defenseLabel: string;
+  if (wall.breached) {
+    defenseLabel = '破';
+  } else if (totalCards === 0) {
+    defenseLabel = `0/${wallLimit}`;
+  } else if (hiddenCount === totalCards) {
+    // 全蓋：不洩漏任何點數
+    defenseLabel = `?/${wallLimit}`;
+  } else if (hiddenCount > 0) {
+    defenseLabel = `${known}+?/${wallLimit}`;
+  } else {
+    defenseLabel = `${known}/${wallLimit}`;
+  }
+
   return (
     <div className={`wall-badge ${
       wall.breached ? 'wall-badge--breached'
@@ -122,7 +128,7 @@ function EnemyBadge({ wall, wallIndex, wallLimit, isFrontline }: { wall: Wall; w
       <span>{WALL_NAMES[wallIndex]}</span>
       {wall.breached
         ? <span className="font-bold">破</span>
-        : <span>{getWallDefenseValue(wall)}/{wallLimit}</span>
+        : <span>{defenseLabel}</span>
       }
     </div>
   );
@@ -144,7 +150,7 @@ function AllyBadge({
     }`}>
       <span>{WALL_NAMES[wallIndex]}</span>
       {isSetup && !setupCommitted ? (
-        <span>{displayCard ? (setupCommitted ? '已部署' : getCardValueLabel(displayCard.value)) : '放置'}</span>
+        <span>{displayCard ? getCardValueLabel(displayCard.value) : '放置'}</span>
       ) : wall.breached ? (
         <span className="font-bold">破</span>
       ) : (
@@ -188,7 +194,6 @@ function renderEnemyCards(
 function renderAllyCards(
   wall: Wall,
   wallIndex: number,
-  _walls: Wall[],
   isSetup: boolean,
   setupCommitted: boolean,
   displayCards?: (Card | null)[],
@@ -220,7 +225,7 @@ function renderAllyCards(
             onDragEnd={() => onCardDragEnd?.()}
           />
         ) : (
-          <div className="slot-empty slot-empty--gold w-11 h-[3.75rem] sm:w-12 sm:h-16 md:w-14 md:h-20">
+          <div className="slot-empty slot-empty--gold slot-card">
             <span className="text-[8px] text-yamabuki-gold/40">空</span>
           </div>
         )}
@@ -237,7 +242,7 @@ function renderAllyCards(
 
   return (
     <div
-      className={`flex gap-1 justify-center items-center cursor-pointer rounded-lg p-0.5 transition-all ${
+      className={`flex gap-1 justify-center items-center flex-wrap cursor-pointer rounded-lg p-0.5 transition-all ${
         selectedWallIndex === wallIndex ? 'ring-1 ring-yamabuki-gold/40 bg-yamabuki-gold/5' : ''
       }`}
       onClick={() => {

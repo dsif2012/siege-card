@@ -26,30 +26,33 @@ interface HandDockProps {
   /* Info chips */
   infoLabel?: string;
   replaceCount?: number;
+
+  /** 右側操作（如確認部署），併入底欄避免多佔一列 */
+  trailingAction?: React.ReactNode;
 }
 
 export function HandDock({
   cards, selectedCardIds, canIControl, onCardClick, emptyMessage,
   isDraggable, onDragStart, onDragEnd,
   isDropTarget, onHandDragOver, onHandDragLeave, onHandDrop, onHandClick,
-  infoLabel, replaceCount,
+  infoLabel, replaceCount, trailingAction,
 }: HandDockProps) {
   return (
-    <div className="hand-dock-wrap flex flex-col">
-      {/* Info bar above hand */}
-      <div className="flex items-center justify-between px-2 py-1 bg-zinc-950/50 border-t border-foreground/5">
-        <div className="player-chip">
+    <div className="hand-dock-wrap">
+      <div className="hand-dock-bar">
+        <div className="player-chip shrink-0">
           <span className="w-1.5 h-1.5 rounded-full bg-yamabuki-gold" />
           <span className="text-foreground/70">{infoLabel ?? '手牌'}</span>
         </div>
         {replaceCount !== undefined && replaceCount > 0 && (
-          <span className="text-[8px] text-yamabuki-gold animate-pulse bg-zinc-900/80 border border-yamabuki-gold/30 px-1.5 py-0.5 rounded-full">
+          <span className="text-[8px] text-yamabuki-gold animate-pulse bg-zinc-900/80 border border-yamabuki-gold/30 px-1.5 py-0.5 rounded-full shrink-0">
             替換 {replaceCount} 張
           </span>
         )}
+        <div className="flex-1" />
+        {trailingAction}
       </div>
 
-      {/* Cards */}
       <div
         className={`hand-dock ${isDropTarget ? 'hand-dock--drop' : ''}`}
         onDragOver={onHandDragOver}
@@ -58,7 +61,7 @@ export function HandDock({
         onClick={onHandClick}
       >
         {cards.length === 0 && (
-          <span className="text-[10px] text-foreground/30 italic py-3">{emptyMessage}</span>
+          <span className="text-[10px] text-foreground/30 italic py-2">{emptyMessage}</span>
         )}
         {cards.map(card => {
           const isSelected = selectedCardIds.includes(card.id);
